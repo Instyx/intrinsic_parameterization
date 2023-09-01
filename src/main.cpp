@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include <igl/read_triangle_mesh.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
@@ -69,10 +70,11 @@ VectorXi fixed_UV_indices;
 MatrixXd fixed_UV_positions;
 
 
-void (*gradp)(SparseMatrix<double, 0, int>&, SparseMatrix<double, 0, int>&) ;
+// void (*gradp)(SparseMatrix<double, 0, int>&, SparseMatrix<double, 0, int>&) ;
 bool igrad;
 
 MatrixXd colors;
+vector<Eigen::Vector3d> colored_points;
 unsigned iterations=1;
 void Redraw()
 {
@@ -123,18 +125,64 @@ static void computeSurfaceGradientMatrix(SparseMatrix<double> & D1, SparseMatrix
 }
 
 
-static void computeGrad_intrinsic(SparseMatrix<double> & D1, SparseMatrix<double> & D2){
-  SparseMatrix<double> G;
-  MatrixXd L,L_out;
-  MatrixXi F_out;
-  igl::edge_lengths(V,F,L);
-  //igl::intrinsic_delaunay_triangulation(L,F,L_out,F_out);
-  igl::grad_intrinsic(L, F, G);
-  D1.resize(F.rows(),V.rows());
-  D2.resize(F.rows(),V.rows());
-  D1=G.block(0,0,F.rows(), V.rows());
-  D2=G.block(F.rows(),0,F.rows(), V.rows());
-  
+static void computeGrad_intrinsic(SparseMatrix<double> & Dx, SparseMatrix<double> & Dy, VectorXd &areas){
+    data_mesh.intTri->requireFaceIndices();
+    
+    SparseMatrix<double>G;
+    areas.resize(F.rows());
+    MatrixXd lengths(F.rows(),3);
+
+
+    // TODO: check if the vertex indices are same as in V 
+    MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+   /* data_mesh.inputGeometry->requireVertexIndices();
+    for(gcs::Vertex v : data_mesh.intTri->intrinsicMesh->vertices()){
+      int i = v.getIndex();
+      cout << data_mesh.inputGeometry->vertexPositions[v] << endl;
+      cout << "V:   " << V.row(i) << endl; 
+    }*/
+    for(gcs::Face face : data_mesh.intTri->intrinsicMesh->faces()){
+      size_t idx = data_mesh.intTri->faceIndices[face];
+      size_t v0 = F_new(idx,0); 
+      size_t v1 = F_new(idx,1); 
+      size_t v2 = F_new(idx,2); 
+      //cout << v0 << "  " << v1 << "  " << v2 << endl;
+      //cout << " - edges - " << endl; 
+      for(gcs::Edge e : face.adjacentEdges()){
+        array<gcs::Vertex, 2> verts = e.adjacentVertices();
+        //cout << data_mesh.intTri->vertexIndices[verts[0]] << "    " << data_mesh.intTri->vertexIndices[verts[1]] << endl;
+        if(data_mesh.intTri->vertexIndices[verts[0]]==v0){
+          if(data_mesh.intTri->vertexIndices[verts[1]]==v1){ // v0 - v1
+            lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
+          }
+          else{ // v0 - v2
+            lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
+          }
+        }
+        else if(data_mesh.intTri->vertexIndices[verts[0]]==v1){
+          if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v1 - v0
+            lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
+          }
+          else{ // v1 - v2
+            lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
+          }
+        }
+        else{
+          if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v2 - v0
+            lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
+          }
+          else{ // v2 - v1
+            lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
+          }
+        }
+      }
+      areas(idx) = data_mesh.intTri->faceArea(face);
+    }
+    igl::grad_intrinsic(lengths, F_new, G);
+    Dx.resize(F.rows(),V.rows());
+    Dy.resize(F.rows(),V.rows());
+    Dx=G.block(0,0,F.rows(), V.rows());
+    Dy=G.block(F.rows(),0,F.rows(), V.rows());
 }
 
 
@@ -310,6 +358,7 @@ double symmetricDrichlet(Matrix2d &J){
     return J.norm() * J.norm() + J.inverse().norm()*J.inverse().norm();
   }
   else{
+    cout << "determinant negative" << endl;
     return 1e7; // should be inf
   }
 
@@ -324,7 +373,7 @@ double arap(Matrix2d &J){
 }
 
 double asap(Matrix2d &J){
-  return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)-J(0,1)) * (J(1,0)-J(0,1)); 
+  return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)+J(0,1)) * (J(1,0)+J(0,1)); 
 
 }
 
@@ -345,13 +394,16 @@ void diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
   E1_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
   temp = (se_len2*se_len2 - se_len1*se_len1 - se_len3*se_len3)/(-2*se_len1); 
   E2_tilde << se_len1, temp, 0 , sqrt(se_len3*se_len3 - temp*temp);
-  
+ 
+  data_mesh.inputGeometry->requireVertexPositions();
 
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
   size_t v4 = data_mesh.intTri->vertexIndices[halfedges[2].tipVertex()];
   
+  //cout << "intri:   "<< data_mesh.inputGeometry->vertexPositions[v1] << ";  start mesh" << V.row(v1) << endl;
+
   E1 << UV(v2,0) - UV(v1,0), UV(v3,0) - UV(v1,0),
         UV(v2,1) - UV(v1,1), UV(v3,1) - UV(v1,1);
   E2 << UV(v1,0) - UV(v2,0), UV(v4,0) - UV(v2,0),
@@ -366,14 +418,13 @@ void faceJacobian(gcs::Face &f, Matrix2d &J){
   std::array<gcs::Halfedge, 3> halfedges;
 
   for(gcs::Halfedge he : f.adjacentHalfedges()){
-    if(i==3) break;
+    if(i==3) break; // assumed triangle faces
     halfedges[i]=he;
     ++i;
   } 
   double fi_len1 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
   double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
   double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
-
 
   Matrix2d E, E_tilde;
   double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
@@ -388,6 +439,326 @@ void faceJacobian(gcs::Face &f, Matrix2d &J){
         UV(v2,1) - UV(v1,1), UV(v3,1) - UV(v1,1);
   J = E * E_tilde.inverse();
   
+}
+/*
+gcs::SurfacePoint correct_if_face(gcs::SurfacePoint pt){
+  gcs::SurfacePoint res;
+  res.type = gcs::SurfacePointType::Edge;
+  if(pt.type == gcs::SurfacePointType::Face){
+    int i = 0;
+    vector<gcs::Vertex> vec;
+    for(gcs::Vertex v : pt.face.adjacentVertices()){
+      if(pt.faceCoords[i]>1e-13){
+        vec.push_back(v);
+        res.tEdge = pt.faceCoords[i];
+      } 
+      ++i;
+    }
+    if(vec.size()!=2) cout << pt.faceCoords << endl;
+    for(gcs::Edge e : pt.face.adjacentEdges()){
+      if(e.firstVertex()==vec[0]&&e.secondVertex()==vec[1]){
+        res.edge = e;
+      }
+      else if(e.firstVertex()==vec[1]&&e.secondVertex()==vec[0]){
+        res.edge = e;
+        res.tEdge = 1 - res.tEdge;
+      }
+
+    }
+    return res;
+  }
+  else return pt;
+}
+
+*/ 
+
+
+Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
+  Eigen::SparseVector<double> result;
+  result.resize(V.rows());
+  if (pt.type == gcs::SurfacePointType::Vertex){
+    result.insert(pt.vertex.getIndex()) = 1;
+  } 
+  else if (pt.type == gcs::SurfacePointType::Edge) {
+    result.insert(pt.edge.firstVertex().getIndex()) = (1-pt.tEdge);
+    result.insert(pt.edge.secondVertex().getIndex()) = pt.tEdge;
+  }
+  else{
+    int i = 0;
+    for(gcs::Vertex v : pt.face.adjacentVertices()){
+      result.insert(v.getIndex())= pt.faceCoords[i];
+      ++i;
+    }
+    colored_points.push_back(V.transpose() * result);
+    cout << "FACEEE in b" << endl;
+    cout << pt.faceCoords << endl;
+  }
+  return result;
+}
+
+
+double howLeftIsaLeftOfb(Vector3d &a, Vector3d &b){
+  Vector3d a_norm = a / a.norm();
+  Vector3d b_norm = b / b.norm();
+  double hop;
+  if(a_norm.dot(b_norm)>0){ // less than 90
+    hop = 1;
+  }
+  else hop = 0;
+  Vector3d rotationAxis = a_norm.cross(b_norm);
+  double rotationAngle = M_PI / 2.0; // 90 degrees in radians
+
+  Quaterniond rotationQuaternion(AngleAxisd(-rotationAngle, rotationAxis));
+
+    // Rotate the original vector using the quaternion
+  Vector3d rotatedVector = rotationQuaternion * b_norm;
+  if(rotatedVector.dot(a)>0){
+    if(a_norm.dot(b_norm)<0){ // less than 90
+      return a_norm.dot(b_norm) + 1;
+    }
+    else{ //more than 90
+      return rotatedVector.dot(a);
+    }
+  }
+  else return 0;
+  
+}
+
+bool aIsLeftOfb(Vector3d &a, Vector3d &b){
+  return howLeftIsaLeftOfb(a, b) > 0;
+}
+
+// input mesh : meshA
+// intrinsic mesh: meshB
+void nextt(gcs::CommonSubdivision &cs, vector<gcs::CommonSubdivisionPoint> res){
+  gcs::CommonSubdivisionPoint curr = res.back();
+  gcs::CommonSubdivisionPoint before = res[res.size()-2];
+  Vector3d seg = V.transpose()*b(curr.posA) - V.transpose()*b(before.posA);
+  gcs::CommonSubdivisionPoint toAdd;
+  double maxx = 0;
+  gcs::Edge leftest_he;
+  if(curr.posA.type == gcs::SurfacePointType::Vertex){
+    for(gcs::Edge e: curr.posA.vertex.adjacentEdges()){
+      if(e.firstVertex() == before.posA.vertex || e.secondVertex() == before.posA.vertex) continue;
+      vector<gcs::CommonSubdivisionPoint*> vec = cs.pointsAlongA[e];
+      //cout << vec.size() << endl;
+      gcs::CommonSubdivisionPoint nxt;
+      if(curr.posA==vec[0]->posA) nxt=*(vec[1]);
+      else if(curr.posA==vec.back()->posA) nxt=*(vec[vec.size()-2]);
+      else {cout << "bu iste bi yanlis" << endl;}
+      if(nxt.posA.type==gcs::SurfacePointType::Face) cout << " ABOOOOOO" << endl;
+      Vector3d temp = V.transpose()*b(nxt.posA) - V.transpose()*b(curr.posA);
+      if(howLeftIsaLeftOfb(temp, seg)>maxx) {
+        leftest_he = e;
+        toAdd =  nxt;
+        maxx = howLeftIsaLeftOfb(temp, seg);
+      }
+    }
+    for(gcs::Edge e: curr.posB.vertex.adjacentEdges()){
+      if(e.firstVertex() == before.posB.vertex || e.secondVertex() == before.posB.vertex) continue;
+      vector<gcs::CommonSubdivisionPoint*> vec = cs.pointsAlongB[e];
+      //cout << vec.size() << endl;
+      gcs::CommonSubdivisionPoint nxt;
+      if(curr.posA==vec[0]->posA) nxt=*(vec[1]);
+      else if(curr.posA==vec.back()->posA) nxt=*(vec[vec.size()-2]);
+      else {cout << "bu iste bi yanlis" << endl;}
+      if(nxt.posA.type==gcs::SurfacePointType::Face) cout << " ABOOOOOO" << endl;
+
+      Vector3d temp = V.transpose()*b(nxt.posA) - V.transpose()*b(curr.posA);
+      if(howLeftIsaLeftOfb(temp, seg)>maxx) {
+        leftest_he = e;
+        toAdd=  nxt;
+        if(toAdd.posB.type == gcs::SurfacePointType::Face) cout << "ALLAH KAHRETSIN CONI" << endl;
+        maxx = howLeftIsaLeftOfb(temp, seg);
+      }
+    }
+    res.push_back(toAdd);
+  }
+
+
+}
+
+/*
+void nextt(gcs::Halfedge &he, bool isInputEdge, vector<gcs::SurfacePoint> &res){
+  gcs::SurfacePoint curr= res.back();
+  Vector3d seg = V.transpose()*b(curr) - V.transpose()*b(res[res.size()-2]);
+  gcs::SurfacePoint toAdd;
+  double maxx = 0;
+  bool flag = true;
+  gcs::Halfedge leftest_he;
+  if(curr.type == gcs::SurfacePointType::Vertex){
+    cout << "curr is vertex " << endl;
+    gcs::SurfacePoint tmp;
+    for(gcs::Halfedge hee : curr.vertex.outgoingHalfedges()){
+      cout << data_mesh.intTri->checkEdgeOriginal(hee.edge()) << endl;
+      vector<gcs::SurfacePoint> vecc = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(hee);
+      cout << vecc.size() << endl;
+      gcs::SurfacePoint nxt = data_mesh.intTri->equivalentPointOnInput(vecc[1]);
+      cout << "traced" << endl;
+      Vector3d temp = V.transpose()*b(nxt) - V.transpose()*b(curr);
+      if(howLeftIsaLeftOfb(temp, seg)>maxx) {
+        cout << "howlefft" << endl;
+        leftest_he = hee;
+        toAdd =  nxt;
+        maxx = howLeftIsaLeftOfb(temp, seg);
+        tmp = vecc[1];
+      }
+    }
+    cout << " first loop " << endl;
+    gcs::SurfacePoint curr_intri = data_mesh.intTri->equivalentPointOnIntrinsic(curr); 
+    for(gcs::Halfedge hee : curr_intri.vertex.outgoingHalfedges()){
+      vector<gcs::SurfacePoint> vec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(hee);
+      Vector3d temp = V.transpose()*b(vec[1]) - V.transpose()*b(curr);
+      if(howLeftIsaLeftOfb(temp, seg)>maxx){
+        leftest_he = hee;
+        toAdd = vec[1];
+        tmp = vec[1];
+        flag = false;
+        maxx = howLeftIsaLeftOfb(temp, seg);
+      }
+    }
+    res.push_back(toAdd);
+    cout << " second loop " << endl;
+    if(toAdd.type == gcs::SurfacePointType::Vertex){
+      nextt(leftest_he, flag, res);
+      return;
+    }
+    else{
+      gcs::Halfedge hee = tmp.edge.halfedge();
+      nextt(hee, flag, res);
+      return;
+    }
+  }
+  if(isInputEdge){
+    vector<gcs::SurfacePoint> vec = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(he);
+    gcs::SurfacePoint st= vec[0];
+    int idx = 0;
+    for(int i=0;i<vec.size();++i){
+      gcs::SurfacePoint pt = data_mesh.intTri->equivalentPointOnInput(vec[i]);
+      if((V.transpose()*b(curr) - V.transpose()*b(pt)).norm()<1e9) idx = i;
+    }
+    if(idx==0){
+      st = data_mesh.intTri->equivalentPointOnInput(vec[idx+1]);
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = vec[idx+1];
+      }
+      else return;
+    }
+    else if(idx==vec.size()-1){
+      st = data_mesh.intTri->equivalentPointOnInput(vec[idx-1]);
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = vec[idx-1];
+      }
+      else return;
+    }
+    else{
+      st = data_mesh.intTri->equivalentPointOnInput(vec[idx-1]);
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)){
+        toAdd = vec[idx-1];
+      }
+      else{
+        toAdd = vec[idx+1];
+      }
+    }
+
+
+    res.push_back(data_mesh.intTri->equivalentPointOnInput(toAdd));
+    if(toAdd.type==gcs::SurfacePointType::Vertex) return; // maybe make toAdd on inputMesh
+    gcs::Halfedge nexthe = toAdd.edge.halfedge();
+    nextt(nexthe, !isInputEdge, res);
+  }
+  else{
+    vector<gcs::SurfacePoint> vec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(he);
+    gcs::SurfacePoint st= vec[0];
+    int idx = 0;
+    for(int i=0;i<vec.size();++i){
+      gcs::SurfacePoint pt = vec[i];
+      if((V.transpose()*b(curr) - V.transpose()*b(pt)).norm()<1e9) idx = i;
+    }
+    if(idx==0){
+      st = vec[idx+1];
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = vec[idx+1];
+      }
+      else return;
+    }
+    else if(idx==vec.size()-1){
+      st = vec[idx-1];
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = vec[idx-1];
+      }
+      else return;
+    }
+    else{
+      st = vec[idx-1];
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr);
+      if(aIsLeftOfb(temp, seg)){
+        toAdd = vec[idx-1];
+      }
+      else{
+        toAdd = vec[idx+1];
+      }
+    }
+
+
+    res.push_back(toAdd);
+    if(toAdd.type==gcs::SurfacePointType::Vertex) return; // maybe make toAdd on inputMesh
+    gcs::Halfedge nexthe = toAdd.edge.halfedge();
+    nextt(nexthe, !isInputEdge, res);
+ 
+  }
+ 
+}
+*/
+void calc_edge_energy(gcs::Edge &e){
+  //if(e.getMesh()!=data_mesh.intTri->intrinsicMesh.release()) return;
+  vector<gcs::SurfacePoint> pointVec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(e.halfedge());
+  //double angle = data_mesh.intTri->signpostAngle[e.halfedge()];
+  Vector3d before = V.transpose() * b(pointVec[0]);
+  bool flag = true;
+  gcs::CommonSubdivision& cs =  data_mesh.intTri->getCommonSubdivision();
+  for(int i=1;i< pointVec.size(); ++i){
+    vector<gcs::CommonSubdivisionPoint> polygon(2);
+    polygon[0].posA=pointVec[i-1];
+    polygon[0].posB=data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i-1]);
+    polygon[1].posA=pointVec[i];
+    polygon[1].posB=data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i]);
+    gcs::SurfacePoint pt = pointVec[i];
+    gcs::Halfedge he; 
+    if(pt.type == gcs::SurfacePointType::Vertex){  //if collect all intrinsic and extrinsic halfedges in the vertex, pick the most left one
+     int v_idx = pt.vertex.getIndex();
+     nextt(cs, polygon);
+     return;
+    }
+    he = pt.edge.halfedge();
+    nextt(cs, polygon);
+    // Vector3d curr = V.transpose() * b(pointVec[i]);
+    gcs::SurfacePoint takkk = data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i]);
+    cout << pointVec[i].tEdge   << endl;
+   // if(takkk.type == gcs::SurfacePointType::Face) cout << "face" << endl;
+   // if(takkk.type == gcs::SurfacePointType::Edge) cout << "edge" << endl;
+   // if(takkk.type == gcs::SurfacePointType::Vertex) cout << "vertex" << endl;
+    if(flag){
+      vector<gcs::SurfacePoint> vec = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(pointVec[i].edge.halfedge());
+      gcs::SurfacePoint st= vec[0];
+      gcs::SurfacePoint nd = vec[1];
+     // if(nd.type == gcs::SurfacePointType::Face) cout << "face" << endl;
+     // if(nd.type == gcs::SurfacePointType::Edge) {
+       // vec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(nd.edge.halfedge());
+       // cout << nd.tEdge << endl;
+     // }
+      //if(nd.type == gcs::SurfacePointType::Vertex) cout << "vertex" << endl;
+   /* 
+      for(int j=0; j< vec.size();++j){
+        if(vec[j].type == gcs::SurfacePointType::Edge) st = vec[j];
+      }*/
+    }
+  }
 }
 
 /*
@@ -447,14 +818,15 @@ void diamondJacobians_uv(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
 unsigned flipThroughEdges(){
   assert(UV.size()!=0 && "Computer parameterization first!!");
   data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireFaceAreas();
   //while(true){
     unsigned totalflips = 0;
-   /* unsigned energy_before=0, energy_after=0;
+    double energy_before=0, energy_after=0;
     for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
       Matrix2d J;
       faceJacobian(face,J);
       energy_before+= energy(J) * data_mesh.intTri->faceArea(face);
-    }*/
+    }
     for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
       if(e.isBoundary()) continue;
       gcs::Face f1 = e.halfedge().face(); 
@@ -471,13 +843,13 @@ unsigned flipThroughEdges(){
       //cout << " after finding the flipped edge" << endl;
       diamondJacobians(flipped, J1_prime, J2_prime);
       double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
-      // cout << " energies: " << before << " -> " << after << endl;
+      //cout << " energies: " << before << " -> " << after << endl;
       double tolerance = 1e-6; // set tolerance to 1e-6 
 
       if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
         if (before > after) {
           totalflips++;
-         // cout << before - after << endl;
+          cout << "flipped diff:  " << before - after << endl;
         }
         else {
           data_mesh.intTri->flipEdgeIfPossible(flipped);
@@ -491,108 +863,187 @@ unsigned flipThroughEdges(){
 
     //if(totalflips==0) break;
     }
-   /* for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
+    data_mesh.intTri->refreshQuantities();
+    for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
       Matrix2d J;
       faceJacobian(face,J);
       energy_after+= energy(J) * data_mesh.intTri->faceArea(face);
-    }*/
+    }
   cout << " totalflips: " << totalflips << endl;
-//  cout << " ENERGY: " << energy_before << "  -->  " << energy_after << endl;
+  cout << " ENERGY: " << energy_before << "  -->  " << energy_after << endl;
  /* for(int i : visited){
     cout << i << endl;
   } */
   return totalflips;
 }
 
-void flip(){
-  data_mesh.intTri->requireFaceIndices();
-  data_mesh.intTri->requireVertexIndices();
+void computeParameterizationIntrinsic(int type){
+  cout << "in parameterization" << endl;
+	SparseMatrix<double> A;
+	VectorXd b;
+	Eigen::SparseMatrix<double> C;
+	VectorXd d;
+	// Find the indices of the boundary vertices of the mesh and put them in fixed_UV_indices
+
+	// prevFreeBoundary is used so that contraints do not need to be computed each time since they are the same
+	// and brute force is expensive
+	if(prevFreeBoundary!=freeBoundary||fixed_UV_indices.size()==0){
+		if (!freeBoundary)
+		{
+			// The boundary vertices should be fixed to positions on the unit disc. Find these position and
+			// save them in the #V x 2 matrix fixed_UV_position.
+			igl::boundary_loop(F, fixed_UV_indices);
+			igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
+		}
+		else{
+			// Fix two UV vertices. This should be done in an intelligent way. Hint: The two fixed vertices should be the two most distant one on the mesh.
+			
+			// brute force to find most distant 2 vertices
+			unsigned fixed1 = 0, fixed2 = 0;
+			for (unsigned i = 0; i < V.rows(); ++i) {
+				for (unsigned j = 0; j < V.rows(); ++j) {
+					if((V.row(i)-V.row(j)).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
+						fixed1 = i;
+						fixed2 = j;
+					}
+				}
+			}
+			fixed_UV_indices.resize(2);
+			fixed_UV_positions.resize(2,2);
+			fixed_UV_indices << fixed1, fixed2;
+			fixed_UV_positions << 1,0,0,1;
+			cout << fixed_UV_indices.size() << endl;
+			cout << fixed_UV_positions << endl;
+
+	  }
+	}
+	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions, C, d); 
+
+
+	A.resize(2*V.rows(),2*V.rows());
+  b.resize(2*V.rows());
+  if(type=='1'){
+    data_mesh.intTri->requireCotanLaplacian();
+    SparseMatrix<double> L = data_mesh.intTri->cotanLaplacian;
+    vector<Triplet<double> > tlist;
+		for (int i = 0; i < L.outerSize(); ++i) {
+			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
+				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value())); 
+				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
+			}
+		}
+		A.setFromTriplets(tlist.begin(), tlist.end());		
+		b = VectorXd::Zero(2*V.rows());
+  }
+
+  if(type=='2'){
+		// Add your code for computing the system for LSCM parameterization
+		// Note that the libIGL implementation is different than what taught in the tutorial! Do not rely on it!!
+		
+		SparseMatrix<double> Dx, Dy;
+		VectorXd areas(F.rows());
+		computeGrad_intrinsic(Dx,Dy,areas);
+		// A = (DxADx + DyADy    DxADy - DyADx)
+		//     (-DxADy + DyADx   DxADx + DyADy)
+		SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
+		SparseMatrix<double> B2 = Dx.transpose()*areas.asDiagonal()*Dy - Dy.transpose()*areas.asDiagonal()*Dx;
+    cout << "as" << endl;
+		vector<Triplet<double> > tlist;
+		for (int i = 0; i < B1.outerSize(); ++i) {
+			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
+				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value()));
+				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
+			}
+		}
   
-  SparseMatrix<double> Dx, Dy, D1, D2, G;
-  VectorXd areas(F.rows());
-  MatrixXd lengths(F.rows(),3);
 
-
-  //flipThroughEdges();
-  MatrixXi F_new = data_mesh.inputMesh->getFaceVertexMatrix<int>();
-  for(gcs::Face face : data_mesh.intTri->intrinsicMesh->faces()){
-    size_t idx = data_mesh.intTri->faceIndices[face];
-    size_t v0 = F_new(idx,0); 
-    size_t v1 = F_new(idx,1); 
-    size_t v2 = F_new(idx,2); 
-    for(gcs::Edge e : face.adjacentEdges()){
-      array<gcs::Vertex, 2> verts = e.adjacentVertices();
-      if(data_mesh.intTri->vertexIndices[verts[0]]==v0){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v1){ // v0 - v1
-          lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v0 - v2
-          lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-      else if(data_mesh.intTri->vertexIndices[verts[0]]==v1){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v1 - v0
-          lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v1 - v2
-          lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-      else{
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v2 - v0
-          lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v2 - v1
-          lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-    }
-    areas(idx) = data_mesh.intTri->faceAreas[face];
+		for (int i = 0; i < B2.outerSize(); ++i) {
+			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B2,i); it; ++it) {
+				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col(), it.value()));
+				tlist.push_back(Triplet<double>(it.row(), it.col()+V.rows(), -it.value()));
+			}
+		}		
+		A.setFromTriplets(tlist.begin(), tlist.end());
+		b = VectorXd::Zero(2*V.rows());
   }
-  // igl::edge_lengths(V, F_new, lengths);
-  igl::grad_intrinsic(lengths, F_new, G);
-  Dx.resize(F.rows(),V.rows());
-  Dy.resize(F.rows(),V.rows());
-  Dx=G.block(0,0,F.rows(), V.rows());
-  Dy=G.block(F.rows(),0,F.rows(), V.rows());
-  computeGrad_intrinsic(D1,D2);
-  VectorXd Dxu = Dx * UV.col(0);		
-  VectorXd Dxv = Dx * UV.col(1);		
-  VectorXd Dyu = Dy * UV.col(0);		
-  VectorXd Dyv = Dy * UV.col(1);
-  MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix if
-  /*
-  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
-    if(e.isBoundary()) continue;
-    double before = 0;
-    for(gcs::Face f : e.adjacentFaces()){
-      size_t idx = data_mesh.intTri->faceIndices(f);
-      Matrix2d J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-      before += energy(J)*areas(idx);
-    }
-    data_mesh.intTri->flipEdgeIfPossible(e);
-    data_mesh.intTri->refreshQuantities();
-      
+
+
+  if(type=='3'){
+    if(UV.size()==0) computeParameterizationIntrinsic('1');
+    data_mesh.intTri->requireFaceIndices();
     
+    SparseMatrix<double> Dx, Dy, G;
+    VectorXd areas(F.rows());
+    MatrixXd lengths(F.rows(),3);
 
+
+    //while(flipThroughEdges());
+
+    unsigned before= 0;
+    unsigned curr = flipThroughEdges();
+    while(before!=curr){
+      before = curr;
+      curr = flipThroughEdges();
+    }
+
+    computeGrad_intrinsic(Dx, Dy, areas);
+    VectorXd Dxu = Dx * UV.col(0);		
+		VectorXd Dxv = Dx * UV.col(1);		
+		VectorXd Dyu = Dy * UV.col(0);		
+		VectorXd Dyv = Dy * UV.col(1);
+		MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix 
+    for (int i = 0; i < F.rows(); ++i) {
+			Matrix2d J, U, S, VV;
+			J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+			SSVD2x2(J, U, S, VV);
+			Matrix2d R = U*VV.transpose();
+			RR(i,0) = R(0,0);
+			RR(i,1) = R(0,1);
+			RR(i,2) = R(1,0);
+			RR(i,3) = R(1,1);
+		}		
+		b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
+		Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
+
+		SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
+
+		vector<Triplet<double> > tlist;
+		for (int i = 0; i < B1.outerSize(); ++i) {
+			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
+				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value()));
+				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
+			}
+		}
+		A.setFromTriplets(tlist.begin(), tlist.end());
   }
-*/
-  for (int i = 0; i < F.rows(); ++i) {
-    Matrix2d J, U, S, VV;
-    J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-    SSVD2x2(J, U, S, VV);
-    Matrix2d R = U*VV.transpose();
-    RR(i,0) = R(0,0);
-    RR(i,1) = R(0,1);
-    RR(i,2) = R(1,0);
-    RR(i,3) = R(1,1);
-  }		
+	// build (A C^t; C 0)
+	SparseMatrix<double> Ct, temp1, temp2, res;
+	Ct = C.transpose();
+	igl::cat(2, A, Ct, temp1);
+	C.conservativeResize(C.rows(), C.rows()+C.cols());
+	igl::cat(1, temp1, C, res);
+
+	VectorXd rhs(2*V.rows()+C.rows());
+	rhs << b,d;
+	SparseLU<SparseMatrix<double> > solver;
+	solver.analyzePattern(res);
+	solver.factorize(res);
+	cout << "solver info: " << solver.info() << endl;
+	Eigen::VectorXd x = solver.solve(rhs);
+
+	UV.resize(V.rows(),2);
+	UV.col(0) = x.segment(0,V.rows());
+ 	UV.col(1) = x.segment(V.rows(),V.rows());
+  cout << "end" << endl;
+ 	prevFreeBoundary = freeBoundary;
+
 }
 
 
 void computeParameterization(int type)
 {
   cout << "in parameterization" << endl;
+  if(igrad && UV.size()!=0) flipThroughEdges();
 	SparseMatrix<double> A;
 	VectorXd b;
 	Eigen::SparseMatrix<double> C;
@@ -690,7 +1141,11 @@ void computeParameterization(int type)
 		//    (0 L)  
     cout << " in 2 " << endl;
 		SparseMatrix<double> L;
-		igl::cotmatrix(V,F,L);
+     if(igrad){
+      data_mesh.intTri->requireCotanLaplacian();
+      L=data_mesh.intTri->cotanLaplacian;
+    }
+	  else	igl::cotmatrix(V,F,L);
   //  cout << "2: " << L << endl;
 		vector<Triplet<double> > tlist;
 		for (int i = 0; i < L.outerSize(); ++i) {
@@ -708,10 +1163,15 @@ void computeParameterization(int type)
 		// Note that the libIGL implementation is different than what taught in the tutorial! Do not rely on it!!
 		
 		SparseMatrix<double> Dx, Dy;
-		gradp(Dx,Dy);
 		VectorXd areas;
-		igl::doublearea(V,F,areas);
-		// areas/=2; //since we always use areas and not its square expilicitly, scaling does not change anything
+    if(igrad){
+      computeGrad_intrinsic(Dx, Dy, areas);
+    }
+    else{
+		  computeSurfaceGradientMatrix(Dx,Dy);
+	  	igl::doublearea(V,F,areas);
+      areas/=2;
+    }
 		
 		// A = (DxADx + DyADy    DxADy - DyADx)
 		//     (-DxADy + DyADx   DxADx + DyADy)
@@ -745,12 +1205,15 @@ void computeParameterization(int type)
 			computeParameterization('3');
 		}
 		VectorXd areas;
-		igl::doublearea(V,F,areas);
-		// areas/=2; //since we always use areas and not its square expilicitly, scaling does not change anything
 		SparseMatrix<double> Dx, Dy;
-    MatrixXd lengths;
-    igl::edge_lengths(V,F, lengths);
-		computeSurfaceGradientMatrix(Dx,Dy);
+    if(igrad){
+      computeGrad_intrinsic(Dx, Dy, areas);
+    }
+    else{
+		  computeSurfaceGradientMatrix(Dx,Dy);
+      igl::doublearea(V,F,areas);
+		  areas/=2;
+    }
 		// to compute the SVD from the previous iteration
 		VectorXd Dxu = Dx * UV.col(0);		
 		VectorXd Dxv = Dx * UV.col(1);		
@@ -783,128 +1246,7 @@ void computeParameterization(int type)
 
 	}
 
-  /*
-	if (type == '5') {
-		// Add your code for computing cotangent Laplacian for Harmonic parameterization
-		// Use can use a function "cotmatrix" from libIGL, but ~~~~***READ THE DOCUMENTATION***~~~~
-
-		//A = (L 0)
-		//    (0 L)  
-    SparseMatrix<double> L = compute_L_intrinsic();
-    vector<Triplet<double> > tlist;
-		boxfor (int i = 0; i < L.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row(), it.col(), -it.value())); // - comes from the warning above 
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), -it.value()));
-			}
-		}
-		A.setFromTriplets(tlist.begin(), tlist.end());		
-		b = VectorXd::Zero(2*V.rows());
-
-	}
-	*/  
-
-  if(type == '5'){
-    if(UV.size()==0) computeParameterization('3');
-    data_mesh.intTri->requireFaceIndices();
-    
-    SparseMatrix<double> Dx, Dy, D1, D2, G;
-    VectorXd areas(F.rows());
-    MatrixXd lengths(F.rows(),3);
-
-
-    //while(flipThroughEdges());
-
-    unsigned before= 0;
-    unsigned curr = flipThroughEdges();
-    while(before!=curr){
-      before = curr;
-      curr = flipThroughEdges();
-    }
-    // TODO: check if the vertex indices are same as in V 
-    MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
-   /* data_mesh.inputGeometry->requireVertexIndices();
-    for(gcs::Vertex v : data_mesh.intTri->intrinsicMesh->vertices()){
-      int i = v.getIndex();
-      cout << data_mesh.inputGeometry->vertexPositions[v] << endl;
-      cout << "V:   " << V.row(i) << endl; 
-    }*/
-    for(gcs::Face face : data_mesh.intTri->intrinsicMesh->faces()){
-      size_t idx = data_mesh.intTri->faceIndices[face];
-      size_t v0 = F_new(idx,0); 
-      size_t v1 = F_new(idx,1); 
-      size_t v2 = F_new(idx,2); 
-      //cout << v0 << "  " << v1 << "  " << v2 << endl;
-      //cout << " - edges - " << endl; 
-      for(gcs::Edge e : face.adjacentEdges()){
-        array<gcs::Vertex, 2> verts = e.adjacentVertices();
-        //cout << data_mesh.intTri->vertexIndices[verts[0]] << "    " << data_mesh.intTri->vertexIndices[verts[1]] << endl;
-        if(data_mesh.intTri->vertexIndices[verts[0]]==v0){
-          if(data_mesh.intTri->vertexIndices[verts[1]]==v1){ // v0 - v1
-            lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-          }
-          else{ // v0 - v2
-            lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-          }
-        }
-        else if(data_mesh.intTri->vertexIndices[verts[0]]==v1){
-          if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v1 - v0
-            lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-          }
-          else{ // v1 - v2
-            lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-          }
-        }
-        else{
-          if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v2 - v0
-            lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-          }
-          else{ // v2 - v1
-            lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-          }
-        }
-      }
-      areas(idx) = data_mesh.intTri->faceArea(face);
-    }
-    // igl::edge_lengths(V, F_new, lengths);
-    igl::grad_intrinsic(lengths, F_new, G);
-    Dx.resize(F.rows(),V.rows());
-    Dy.resize(F.rows(),V.rows());
-    Dx=G.block(0,0,F.rows(), V.rows());
-    Dy=G.block(F.rows(),0,F.rows(), V.rows());
-  	VectorXd Dxu = Dx * UV.col(0);		
-		VectorXd Dxv = Dx * UV.col(1);		
-		VectorXd Dyu = Dy * UV.col(0);		
-		VectorXd Dyv = Dy * UV.col(1);
-		MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix 
-    for (int i = 0; i < F.rows(); ++i) {
-			Matrix2d J, U, S, VV;
-			J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-			SSVD2x2(J, U, S, VV);
-			Matrix2d R = U*VV.transpose();
-			RR(i,0) = R(0,0);
-			RR(i,1) = R(0,1);
-			RR(i,2) = R(1,0);
-			RR(i,3) = R(1,1);
-		}		
-		b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
-		Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
-
-		SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-
-		vector<Triplet<double> > tlist;
-		for (int i = 0; i < B1.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value()));
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
-			}
-		}
-		A.setFromTriplets(tlist.begin(), tlist.end());
-
-
-  }
-
-	// Solve the linear system.
+  // Solve the linear system.
 	// Construct the system as discussed in class and the assignment sheet
 	// Use igl::cat to concatenate matrices
 	// Use Eigen::SparseLU to solve the system. Refer to tutorial 3 for more detail
@@ -931,9 +1273,59 @@ void computeParameterization(int type)
  	prevFreeBoundary = freeBoundary;
 }
 
+
+
+void intrinsicEdges(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri, const Eigen::MatrixXd& V, Eigen::MatrixXd& P1, Eigen::MatrixXd& P2, MatrixXd& colors) {
+  vector<Eigen::Vector3d> points;
+  vector<array<int,2> > edges;
+  /*
+  for(gcs::Edge e : data_mesh.inputMesh->edges()){
+    points.push_back(V.row(e.firstVertex().getIndex()).transpose());
+    points.push_back(V.row(e.secondVertex().getIndex()).transpose());
+    int t = points.size();
+    std::array<int, 2> tmp{t-2, t-1};
+    edges.push_back(tmp);
+    
+  }
+  int ne = edges.size();
+  */
+  for(gcs::Edge e : intTri->intrinsicMesh->edges()) {
+    std::vector<gcs::SurfacePoint> pointVec = intTri->traceIntrinsicHalfedgeAlongInput(e.halfedge());
+    if(pointVec.size()==2) continue;
+    for (int k = 0; k < pointVec.size(); k++) {
+      points.push_back(V.transpose()*b(pointVec[k]));
+      if (k == 0) continue;
+      int t = points.size();
+      std::array<int, 2> tmp{t-2, t-1};
+      edges.push_back(tmp);
+    }
+  }
+  P1.resize(edges.size(),3);
+  P2.resize(edges.size(),3);
+  /*
+  for(int i = 0; i< points.size();++i){
+    P.row(i) = points[i].transpose();
+  }
+  E.resize(edges.size(),2);
+  */
+  int i = 0;
+  for(auto e : edges){
+    P1.row(i) = points[e[0]].transpose();
+    P2.row(i) = points[e[1]].transpose();
+    i++;
+  }
+  colors.resize(edges.size(),3);
+  /*
+  for(int j = 0; j < ne; ++j){
+    colors.row(j) = Eigen::RowVector3d(0.5,0.5,0);
+  }*/
+  for(int j = 0; j < edges.size(); ++j){
+    colors.row(j) = Eigen::RowVector3d(1,0,0);
+  }
+}
+
+
 bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
-	if(igrad) gradp = computeGrad_intrinsic;
-  else gradp = computeSurfaceGradientMatrix;
 	switch (key) {
   case '1':
 	case '2':
@@ -945,11 +1337,12 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     if(option_en==2) energy=asap;
     if(option_en==3) energy=arap;
 		reset=true;
-		if(key=='4' || key=='5'){
+		if(key=='4'){
 			unsigned its = iterations;
-			while(its--) computeParameterization(key);
+			while(its--) 
+        computeParameterization(key);
 		}
-		else computeParameterization(key);
+    computeParameterization(key);
 			// Add your code for detecting and displaying flipped triangles in the
 			// UV domain here
 		break;
@@ -959,7 +1352,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 		reset=false;
 		cout << "Conformal distortion" << endl;
 		SparseMatrix<double> Dx, Dy;
-		gradp(Dx,Dy);
+    VectorXd areas;
+    if(igrad) computeGrad_intrinsic(Dx,Dy, areas);
+    else	computeSurfaceGradientMatrix(Dx,Dy);	
 		VectorXd Dxu = Dx * UV.col(0);
 		VectorXd Dxv = Dx * UV.col(1);
 		VectorXd Dyu = Dy * UV.col(0);
@@ -989,7 +1384,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 		reset=false;
 		cout << "Isometric distortion" << endl;			
 		SparseMatrix<double> Dx, Dy;
-		gradp(Dx,Dy);
+    VectorXd areas;
+    if(igrad) computeGrad_intrinsic(Dx,Dy, areas);
+    else	computeSurfaceGradientMatrix(Dx,Dy);
 		VectorXd Dxu = Dx * UV.col(0);
 		VectorXd Dxv = Dx * UV.col(1);
 		VectorXd Dyu = Dy * UV.col(0);
@@ -1018,7 +1415,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 		reset=false;
 		cout << "Authalic distortion" << endl;			
 		SparseMatrix<double> Dx, Dy;
-		gradp(Dx,Dy);
+    VectorXd areas;
+    if(igrad) computeGrad_intrinsic(Dx,Dy, areas);
+    else	computeSurfaceGradientMatrix(Dx,Dy);
 		VectorXd Dxu = Dx * UV.col(0);
 		VectorXd Dxv = Dx * UV.col(1);
 		VectorXd Dyu = Dy * UV.col(0);
@@ -1046,16 +1445,38 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 		break;
   case 'f':
     {
-      cout << " f " << endl;      
-      computeParameterization('2');
+      cout << " f " << endl; 
+      if(UV.size()==0)
+        computeParameterization('2');
       cout << " starting flipping " << endl;
       if(option_en==0) energy=drichlet;
       if(option_en==1) energy=symmetricDrichlet;
       if(option_en==2) energy=asap;
       if(option_en==3) energy=arap;
       flipThroughEdges();
+      for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
+        calc_edge_energy(e);
+      }
     }
     break;
+  case 'v':
+    {
+      Eigen::MatrixXd P1, P2,C;
+      Eigen::MatrixXi E;
+      Eigen::MatrixXd colors;
+      intrinsicEdges(data_mesh.intTri, V, P1, P2, colors);
+      viewer.data().clear();
+      viewer.data().set_mesh(V,F);
+      C.resize(colored_points.size(),3);
+      for (int i=0; i < colored_points.size(); ++i) {
+        C.row(i) = colored_points[i].transpose();
+      }
+      viewer.data().point_size = 12;    
+      viewer.data().add_points(C, Eigen::RowVector3d(0, 0, 1));
+      viewer.data().add_edges(P1, P2, colors);
+      viewer.data().show_faces=true;
+      break;
+    }
 	case '+':
 		TextureResolution /= 2;
 		break;
@@ -1081,7 +1502,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     }
     break;
 	}
-	Redraw();	
+	if(key!='v') Redraw();	
 	return true;
 }
 
@@ -1118,7 +1539,6 @@ bool callback_init(Viewer &viewer)
 
 int main(int argc,char *argv[]) {
   if(argc != 2) {
-    gradp = computeSurfaceGradientMatrix;
     int reps = 10;
     outfile << "test mode" << endl;
     outfile << " ------------------------- " << endl;
@@ -1237,7 +1657,6 @@ int main(int argc,char *argv[]) {
     load_mesh(argv[1]);
   }
 
-  gradp = computeSurfaceGradientMatrix;
   energy = drichlet;
   igl::opengl::glfw::imgui::ImGuiPlugin plugin;
   viewer.plugins.push_back(&plugin);
