@@ -377,6 +377,29 @@ double asap(Matrix2d &J){
 
 }
 
+Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
+  Eigen::SparseVector<double> result;
+  result.resize(V.rows());
+  if (pt.type == gcs::SurfacePointType::Vertex){
+    result.insert(pt.vertex.getIndex()) = 1;
+  } 
+  else if (pt.type == gcs::SurfacePointType::Edge) {
+    result.insert(pt.edge.firstVertex().getIndex()) = (1-pt.tEdge);
+    result.insert(pt.edge.secondVertex().getIndex()) = pt.tEdge;
+  }
+  else{
+    int i = 0;
+    for(gcs::Vertex v : pt.face.adjacentVertices()){
+      result.insert(v.getIndex())= pt.faceCoords[i];
+      ++i;
+    }
+    colored_points.push_back(V.transpose() * result);
+    cout << "FACEEE in b" << endl;
+    cout << pt.faceCoords << endl;
+  }
+  return result;
+}
+
 
 // TODO check whether the order of edges change the Jacobian
 void diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
@@ -440,6 +463,21 @@ void faceJacobian(gcs::Face &f, Matrix2d &J){
   J = E * E_tilde.inverse();
   
 }
+
+void triangleJacobian(std::vector<gcs::SurfacePoint> &vec, Matrix2d &J){
+  double len1 = (V.transpose()*(b(vec[1])-b(vec[0]))).norm();
+  double len2 = (V.transpose()*(b(vec[2])-b(vec[0]))).norm();
+  double len3 = (V.transpose()*(b(vec[2])-b(vec[1]))).norm();
+  Matrix2d E, E_tilde;
+  double temp = (len2*len2 - len1*len1 - len3*len3)/(-2*len1); 
+  E_tilde << len1, temp, 0 , sqrt(len3*len3 - temp*temp);
+  Vector2d seg1 = UV.transpose() * (b(vec[1])-b(vec[0]));
+  Vector2d seg2 = UV.transpose() * (b(vec[2])-b(vec[0]));
+  E << seg1, seg2;
+  J = E * E_tilde.inverse();
+
+  
+}
 /*
 gcs::SurfacePoint correct_if_face(gcs::SurfacePoint pt){
   gcs::SurfacePoint res;
@@ -473,38 +511,15 @@ gcs::SurfacePoint correct_if_face(gcs::SurfacePoint pt){
 */ 
 
 
-Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
-  Eigen::SparseVector<double> result;
-  result.resize(V.rows());
-  if (pt.type == gcs::SurfacePointType::Vertex){
-    result.insert(pt.vertex.getIndex()) = 1;
-  } 
-  else if (pt.type == gcs::SurfacePointType::Edge) {
-    result.insert(pt.edge.firstVertex().getIndex()) = (1-pt.tEdge);
-    result.insert(pt.edge.secondVertex().getIndex()) = pt.tEdge;
-  }
-  else{
-    int i = 0;
-    for(gcs::Vertex v : pt.face.adjacentVertices()){
-      result.insert(v.getIndex())= pt.faceCoords[i];
-      ++i;
-    }
-    colored_points.push_back(V.transpose() * result);
-    cout << "FACEEE in b" << endl;
-    cout << pt.faceCoords << endl;
-  }
-  return result;
-}
-
 
 double howLeftIsaLeftOfb(Vector3d &a, Vector3d &b){
   Vector3d a_norm = a / a.norm();
   Vector3d b_norm = b / b.norm();
   double hop;
   if(a_norm.dot(b_norm)>0){ // less than 90
-    hop = 1;
+    hop = 0;
   }
-  else hop = 0;
+  else hop = 1;
   Vector3d rotationAxis = a_norm.cross(b_norm);
   double rotationAngle = M_PI / 2.0; // 90 degrees in radians
 
@@ -513,14 +528,14 @@ double howLeftIsaLeftOfb(Vector3d &a, Vector3d &b){
     // Rotate the original vector using the quaternion
   Vector3d rotatedVector = rotationQuaternion * b_norm;
   if(rotatedVector.dot(a)>0){
-    if(a_norm.dot(b_norm)<0){ // less than 90
-      return a_norm.dot(b_norm) + 1;
+    if(a_norm.dot(b_norm)>0){ // less than 90
+      return rotatedVector.dot(a_norm);
     }
     else{ //more than 90
-      return rotatedVector.dot(a);
+      return 1-b_norm.dot(a_norm);
     }
   }
-  else return 0;
+  else return -1;
   
 }
 
@@ -530,15 +545,20 @@ bool aIsLeftOfb(Vector3d &a, Vector3d &b){
 
 // input mesh : meshA
 // intrinsic mesh: meshB
-void nextt(gcs::CommonSubdivision &cs, vector<gcs::CommonSubdivisionPoint> res){
+void nextt(gcs::CommonSubdivision &cs, bool IsInputEdge, vector<gcs::CommonSubdivisionPoint> &res){
   gcs::CommonSubdivisionPoint curr = res.back();
+  if(res[0].posA==curr.posA) return; // polygon completed
   gcs::CommonSubdivisionPoint before = res[res.size()-2];
   Vector3d seg = V.transpose()*b(curr.posA) - V.transpose()*b(before.posA);
   gcs::CommonSubdivisionPoint toAdd;
   double maxx = 0;
   gcs::Edge leftest_he;
   if(curr.posA.type == gcs::SurfacePointType::Vertex){
+    cout << "vertex 0 = "<< res[0].posA.vertex.getIndex() << endl;
+    cout << curr.posA.vertex.getIndex() << endl;
+    bool isnextinput = false;
     for(gcs::Edge e: curr.posA.vertex.adjacentEdges()){
+      // input edges
       if(e.firstVertex() == before.posA.vertex || e.secondVertex() == before.posA.vertex) continue;
       vector<gcs::CommonSubdivisionPoint*> vec = cs.pointsAlongA[e];
       //cout << vec.size() << endl;
@@ -555,6 +575,7 @@ void nextt(gcs::CommonSubdivision &cs, vector<gcs::CommonSubdivisionPoint> res){
       }
     }
     for(gcs::Edge e: curr.posB.vertex.adjacentEdges()){
+      // intrinsic edges
       if(e.firstVertex() == before.posB.vertex || e.secondVertex() == before.posB.vertex) continue;
       vector<gcs::CommonSubdivisionPoint*> vec = cs.pointsAlongB[e];
       //cout << vec.size() << endl;
@@ -570,9 +591,62 @@ void nextt(gcs::CommonSubdivision &cs, vector<gcs::CommonSubdivisionPoint> res){
         toAdd=  nxt;
         if(toAdd.posB.type == gcs::SurfacePointType::Face) cout << "ALLAH KAHRETSIN CONI" << endl;
         maxx = howLeftIsaLeftOfb(temp, seg);
+        isnextinput = true;
+      }
+    }
+    if(maxx==0) return;
+    res.push_back(toAdd);
+    nextt(cs, isnextinput, res);
+  }
+  else if(curr.posA.type == gcs::SurfacePointType::Edge){
+    cout << " edge " << endl;
+    vector<gcs::CommonSubdivisionPoint*> vec;
+    if(IsInputEdge){
+      vec = cs.pointsAlongA[curr.posA.edge];
+    }
+    else{
+      vec = cs.pointsAlongB[curr.posB.edge];
+    }
+    // find the index of curr point on the vec
+    int idx = 0;
+    for(int i=0;i<vec.size();++i){
+      gcs::SurfacePoint pt = vec[i]->posA;
+      if((V.transpose()*b(curr.posA) - V.transpose()*b(pt)).norm()<1e9) idx = i;
+    }
+    gcs::SurfacePoint st,nd;
+    // if the curr is at start only direction is vec[1]
+    if(idx==0){
+      st = vec[1]->posA;
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr.posA);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = *(vec[1]);
+      }
+      else return;
+    }
+
+    else if(idx==vec.size()-1){
+      st = vec[idx-1]->posA;
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr.posA);
+      if(aIsLeftOfb(temp, seg)) {
+        toAdd = *(vec[idx-1]);
+      }
+      else return;
+    }
+    else{
+      st = vec[idx-1]->posA;
+      Vector3d temp = V.transpose()*b(st) - V.transpose()*b(curr.posA);
+      if(aIsLeftOfb(temp, seg)){
+        toAdd = *(vec[idx-1]);
+      }
+      else{
+        toAdd = *(vec[idx+1]);
       }
     }
     res.push_back(toAdd);
+    nextt(cs,!IsInputEdge, res);
+  }
+  else{
+    cout << "FACE POINTTTT!!! " << endl;
   }
 
 
@@ -716,50 +790,76 @@ void nextt(gcs::Halfedge &he, bool isInputEdge, vector<gcs::SurfacePoint> &res){
 }
 */
 void calc_edge_energy(gcs::Edge &e){
+  if(e.isBoundary()) return;
   //if(e.getMesh()!=data_mesh.intTri->intrinsicMesh.release()) return;
-  vector<gcs::SurfacePoint> pointVec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(e.halfedge());
-  //double angle = data_mesh.intTri->signpostAngle[e.halfedge()];
-  Vector3d before = V.transpose() * b(pointVec[0]);
-  bool flag = true;
   gcs::CommonSubdivision& cs =  data_mesh.intTri->getCommonSubdivision();
+  vector<gcs::CommonSubdivisionPoint*> pointVec = cs.pointsAlongB[e];
+  //double angle = data_mesh.intTri->signpostAngle[e.halfedge()];
   for(int i=1;i< pointVec.size(); ++i){
     vector<gcs::CommonSubdivisionPoint> polygon(2);
-    polygon[0].posA=pointVec[i-1];
-    polygon[0].posB=data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i-1]);
-    polygon[1].posA=pointVec[i];
-    polygon[1].posB=data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i]);
-    gcs::SurfacePoint pt = pointVec[i];
-    gcs::Halfedge he; 
-    if(pt.type == gcs::SurfacePointType::Vertex){  //if collect all intrinsic and extrinsic halfedges in the vertex, pick the most left one
-     int v_idx = pt.vertex.getIndex();
-     nextt(cs, polygon);
-     return;
-    }
-    he = pt.edge.halfedge();
-    nextt(cs, polygon);
-    // Vector3d curr = V.transpose() * b(pointVec[i]);
-    gcs::SurfacePoint takkk = data_mesh.intTri->equivalentPointOnIntrinsic(pointVec[i]);
-    cout << pointVec[i].tEdge   << endl;
-   // if(takkk.type == gcs::SurfacePointType::Face) cout << "face" << endl;
-   // if(takkk.type == gcs::SurfacePointType::Edge) cout << "edge" << endl;
-   // if(takkk.type == gcs::SurfacePointType::Vertex) cout << "vertex" << endl;
-    if(flag){
-      vector<gcs::SurfacePoint> vec = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(pointVec[i].edge.halfedge());
-      gcs::SurfacePoint st= vec[0];
-      gcs::SurfacePoint nd = vec[1];
-     // if(nd.type == gcs::SurfacePointType::Face) cout << "face" << endl;
-     // if(nd.type == gcs::SurfacePointType::Edge) {
-       // vec = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(nd.edge.halfedge());
-       // cout << nd.tEdge << endl;
-     // }
-      //if(nd.type == gcs::SurfacePointType::Vertex) cout << "vertex" << endl;
-   /* 
-      for(int j=0; j< vec.size();++j){
-        if(vec[j].type == gcs::SurfacePointType::Edge) st = vec[j];
-      }*/
-    }
+    polygon[0]=*(pointVec[i-1]);
+    polygon[1]=*(pointVec[i]);
+    nextt(cs,true, polygon);
+    cout << polygon.size() << endl;
   }
 }
+bool compareVectors(const std::vector<gcs::SurfacePoint>& a, const std::vector<gcs::SurfacePoint>& b) {
+    return a.size() < b.size();
+}
+  
+
+double calc_energy(gcs::Halfedge &he){
+  gcs::Halfedge he1 = he;
+  gcs::Halfedge he2 = he1.next();
+  gcs::Halfedge he3 = he2.next();
+  vector<vector<gcs::SurfacePoint> > vec(3);
+  vec[0] = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(he1);
+  vec[1] = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(he2);
+  vec[2] = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(he3);
+  sort(vec.begin(), vec.end(), compareVectors);
+  int i = 0;
+  int j;
+  if(vec[2][0] == vec[1].back()) j = vec[1].size()-2;
+  else j = vec[1].size()-2;
+  int idx =0;
+  vector<vector<gcs::SurfacePoint> > subdivided(vec[2].size()+vec[1].size()-3); 
+  bool flag = true;
+  cout << vec[2].size() << "   " << vec[1].size() << "   " << vec[0].size() << endl;
+  // need to change the subdivision, maybe make the intrinsic triangle flat first 
+  while(i<vec[2].size()-1){
+    if(flag){
+      subdivided[idx].push_back(vec[2][i]);
+      subdivided[idx].push_back(vec[2][i+1]);
+      subdivided[idx].push_back(vec[1][j]);
+      ++i;
+      ++idx;
+      flag = !flag;
+    }
+    else{
+      if(j>0){
+        subdivided[idx].push_back(vec[2][i]);
+        subdivided[idx].push_back(vec[1][j]);
+        subdivided[idx].push_back(vec[1][j-1]);
+        --j;
+        ++idx;
+      }
+      flag=!flag;
+    }
+  }
+  double total_energy=0;
+  for(auto f : subdivided){
+    Matrix2d J;
+    triangleJacobian(f,J);
+    // cout << J << endl;
+    Vector3d seg1 = V.transpose() * (b(f[1])-b(f[0]));
+    Vector3d seg2 = V.transpose() * (b(f[2])-b(f[0]));
+    double area = (seg1.cross(seg2)).norm()/2;
+    total_energy+= area*energy(J);
+  }
+
+  return total_energy;
+}
+
 
 /*
 void diamondJacobians_uv(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
@@ -1454,9 +1554,11 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       if(option_en==2) energy=asap;
       if(option_en==3) energy=arap;
       flipThroughEdges();
-      for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
-        calc_edge_energy(e);
+      double total_energy = 0;
+      for(gcs::Halfedge he : data_mesh.intTri->intrinsicMesh->halfedges()){
+        total_energy += calc_energy(he);
       }
+      cout << total_energy << endl;;
     }
     break;
   case 'v':
