@@ -789,6 +789,37 @@ void nextt(gcs::Halfedge &he, bool isInputEdge, vector<gcs::SurfacePoint> &res){
  
 }
 */
+
+void triangle(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, gcs::Halfedge &he1, gcs::Halfedge &he2, gcs::Halfedge &he3){
+    double len1 = data_mesh.intTri->edgeLengths[he1.edge()];
+    double len2 = data_mesh.intTri->edgeLengths[he2.edge()];
+    double len3 = data_mesh.intTri->edgeLengths[he3.edge()];
+    Matrix2d E, E_tilde;
+    double temp = (len2*len2 - len1*len1 - len3*len3)/(-2*len1); 
+    E_tilde << len1, temp, 0 , sqrt(len3*len3 - temp*temp);
+    MatrixXd EE((vec1.size()+vec2.size()-3)*2,2); 
+    vector<vector<gcs::SurfacePoint>>
+    int i=0;
+    int j=1;
+    double seg_len1 = 0;
+    double seg_len2 = 0;
+    while(i<vec1.size()-1){
+      Vector2d edgevec_before1 = seg_len1/len1 * E_tilde.col(0);
+      Vector2d edgevec_before2 = seg_len2/len2 * E_tilde.col(1);
+      seg_len1 += (V.transpose()*(b(vec[i+1])-b(vec[i]))).norm();
+      seg_len2 += (V.transpose()*(b(vec[j])-b(vec[j-1]))).norm();
+      Vector2d edgevec1 = seg_len1/len1 * E_tilde.col(0);
+      Vector2d edgevec2 = seg_len2/len2 * E_tilde.col(1);
+      EE.block((i+j-1)*2,0,2,2) << (edgevec1-edgevec_before1), (edgevec2-edgevec_before1);
+      if(j!=vec.size()-1){
+        ++j;
+        EE.block((i+j-1)*2,0,2) << (edgevec2-edgevec_before2), (edgevec_before1-edgevec_before2);
+      }
+      ++i;
+    }
+}
+
+
 void calc_edge_energy(gcs::Edge &e){
   if(e.isBoundary()) return;
   //if(e.getMesh()!=data_mesh.intTri->intrinsicMesh.release()) return;
@@ -818,9 +849,13 @@ double calc_energy(gcs::Halfedge &he){
   vec[2] = data_mesh.intTri->traceIntrinsicHalfedgeAlongInput(he3);
   sort(vec.begin(), vec.end(), compareVectors);
   int i = 0;
-  int j;
-  if(vec[2][0] == vec[1].back()) j = vec[1].size()-2;
-  else j = vec[1].size()-2;
+  int j =0 ;
+  if(vec[2][0] == vec[1].back()){
+    reverse(vec[2].begin(),vec[2].end());
+  } 
+  else {
+    reverse(vec[1].begin(),vec[1].end());
+  }
   int idx =0;
   vector<vector<gcs::SurfacePoint> > subdivided(vec[2].size()+vec[1].size()-3); 
   bool flag = true;
@@ -833,15 +868,62 @@ double calc_energy(gcs::Halfedge &he){
       subdivided[idx].push_back(vec[1][j]);
       ++i;
       ++idx;
-      flag = !flag;
+      if(vec[1][j].type == gcs::SurfacePointType::Vertex){
+        if(vec[2][i].type == gcs::SurfacePointType::Vertex){
+          if(i==vec[2][i].size()-1) break;
+        }
+        else{
+          if(vec[1][j].vertex.getIndex() == vec[2][i].edge.firstVertex().getIndex() && vec[1][j].vertex.getIndex() == vec[2][i].edge.firstVertex().getIndex() ){
+          }
+          else{
+            flag = !flag;
+          }
+        }
+      }
+      else{
+        if(vec[2][i].type == gcs::SurfacePointType::Vertex){
+          if(vec[1][j].vertex.getIndex() == vec[2][i].edge.firstVertex().getIndex() && vec[1][j].vertex.getIndex() == vec[2][i].edge.firstVertex().getIndex() ){
+          }
+          else{
+            flag = !flag;
+          }
+        }
+        else{
+          if(vec[1][j].edge.getIndex() != vec[2].edge.getIndex()) flag = !flag;
+        }
+      }
     }
     else{
-      if(j>0){
-        subdivided[idx].push_back(vec[2][i]);
-        subdivided[idx].push_back(vec[1][j]);
-        subdivided[idx].push_back(vec[1][j-1]);
-        --j;
-        ++idx;
+      subdivided[idx].push_back(vec[2][i]);
+      subdivided[idx].push_back(vec[1][j]);
+      subdivided[idx].push_back(vec[1][j+1]);
+      j;
+      ++idx;
+      if(vec[1][j].type == gcs::SurfacePointType::Vertex){
+        if(vec[2][i].type == gcs::SurfacePointType::Vertex){
+          f(j==vec[1][j].size()-1) break;
+        }
+        else{
+          if(vec[1][j].vertex.getIndex() == vec[2][i].edge.firstVertex().getIndex() || vec[1][j].vertex.getIndex() == vec[2][i].edge.secondVertex().getIndex() ){
+          }
+          else{
+            flag = !flag;
+          }
+        }
+      }
+      else{
+        if(vec[2][i].type == gcs::SurfacePointType::Vertex){
+          if(vec[2][i].vertex.getIndex() == vec[1][j].edge.firstVertex().getIndex() || vec[2][i].vertex.getIndex() == vec[1][j].edge.secondVertex().getIndex() ){
+          }
+          else{
+            flag = !flag;
+          }
+        }
+        else{
+          if(vec[1][j].edge.getIndex() == vec[2].edge.getIndex()) flag = !flag;
+        }
+      }
+    }
       }
       flag=!flag;
     }
