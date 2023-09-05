@@ -75,6 +75,8 @@ MatrixXd fixed_UV_positions;
 bool igrad;
 
 MatrixXd colors;
+MatrixXd C1;
+MatrixXd C2;
 vector<Eigen::Vector3d> colored_points;
 unsigned iterations=1;
 void Redraw()
@@ -791,55 +793,75 @@ void nextt(gcs::Halfedge &he, bool isInputEdge, vector<gcs::SurfacePoint> &res){
 }
 */
 
-void triangle(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, double len1, double len2, double len3 , MatrixXd &J, VectorXd &areas){
+double triangle(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, double len1, double len2, double len3, bool complete, MatrixXd &J, VectorXd &areas){
  // cout << "lengts: " << len1 << "  " << len2 << "  " << len3 << endl;
   Matrix2d E, E_tilde;
-  double temp = (len2*len2 - len1*len1 - len3*len3)/(-2*len1); 
-  E_tilde << len1, temp, 0 , sqrt(len3*len3 - temp*temp);
-  J.resize((vec1.size()+vec2.size()-3)*2,2); 
-  areas.resize(vec1.size()+vec2.size()-3);
+  double temp = (len3*len3 - len1*len1 - len2*len2)/(-2*len1); 
+  E_tilde << len1, temp, 0 , sqrt(len2*len2 - temp*temp);
+  if(len2*len2 < temp* temp) cout <<  " ABOOOOOO " << endl;
+  int face_size = 1 + (vec2.size()-2)*2;
+  if(complete){
+    face_size += vec1.size() - vec2.size(); 
+  }
+  J.resize(face_size*2,2); 
+  areas.resize(face_size);
+
   int i=0;
-  int j=1;
+  int j=0;
   double seg_len1 = 0;
   double seg_len2 = 0;
-  while(i<vec1.size()-1){
-    Vector2d edgevec_before1 = seg_len1/len1 * E_tilde.col(0);
-    Vector2d edgevec_before2 = seg_len2/len2 * E_tilde.col(1);
+  Vector2d edgevec1;
+  Vector2d edgevec2;
+  Matrix2d EE_tilde, EE;
+  seg_len1 += (V.transpose()*(b(vec1[i+1])-b(vec1[i]))).norm();
+  seg_len2 += (V.transpose()*(b(vec2[j+1])-b(vec2[j]))).norm();
+  Vector2d edgevec_before1 = seg_len1/len1 * E_tilde.col(0);
+  Vector2d edgevec_before2 = seg_len2/len2 * E_tilde.col(1);
+  // add first triangle 
+  EE_tilde << edgevec_before1, edgevec_before2;
+  EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j+1])-b(vec1[i]));
+  J.block(0,0,2,2) << EE * EE_tilde.inverse();
+  areas(0) = abs(EE_tilde.determinant())/2;
+  int idx = 1;
+  ++i;
+  ++j;
+  //cout << " 3D flat: " << endl; 
+  //cout << EE_tilde << endl;
+  //cout << " UV " << endl;
+  //cout << EE << endl;
+  while(j<vec2.size()-1){
     seg_len1 += (V.transpose()*(b(vec1[i+1])-b(vec1[i]))).norm();
-    seg_len2 += (V.transpose()*(b(vec1[j])-b(vec2[j-1]))).norm();
-    Vector2d edgevec1 = seg_len1/len1 * E_tilde.col(0);
-    Vector2d edgevec2 = seg_len2/len2 * E_tilde.col(1);
-    Matrix2d EE_tilde, EE;
-    int idx = i+j-1;
-    EE_tilde << (edgevec1-edgevec_before1), (edgevec2-edgevec_before1);
+    seg_len2 += (V.transpose()*(b(vec2[j+1])-b(vec2[j]))).norm();
+    edgevec1 = seg_len1/len1 * E_tilde.col(0);
+    edgevec2 = seg_len2/len2 * E_tilde.col(1);
+    EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
     EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j])-b(vec1[i]));
     J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
     areas(idx) = abs(EE_tilde.determinant())/2;
-    //cout << " UV " << endl;
-    //cout << EE << endl;
-    //cout << " local 3D " << endl;
-    //cout << EE_tilde << endl;
-
-    //cout << " Jacobian " << endl;
-    //cout << J.block(idx*2,0,2,2) << endl;
-    //cout << " area: " << areas(idx) << endl;
+    EE_tilde << (edgevec_before2-edgevec2), (edgevec1-edgevec2);
+    EE << UV.transpose()*(b(vec2[j])-b(vec2[j+1])), UV.transpose()*(b(vec1[i+1])-b(vec2[j+1]));
+    J.block(idx*2+2,0,2,2) << EE * EE_tilde.inverse();
+    areas(idx+1) = abs(EE_tilde.determinant())/2;
     ++i;
-    if(j!=vec2.size()-1){
-      idx = i+j-1;
-      EE_tilde << (edgevec1-edgevec_before2), (edgevec2-edgevec_before2);
-      EE << UV.transpose()*(b(vec1[i])-b(vec2[j])), UV.transpose()*(b(vec2[j+1])-b(vec2[j]));
+    ++j;
+    idx+=2;
+    edgevec_before1 = edgevec1;
+    edgevec_before2 = edgevec2;
+  }
+  if(complete){
+    while(i<vec1.size()-1){
+      seg_len1 += (V.transpose()*(b(vec1[i+1])-b(vec1[i]))).norm();
+      edgevec1 = seg_len1/len1 * E_tilde.col(0);
+      EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
+      EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j])-b(vec1[i]));
       J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
       areas(idx) = abs(EE_tilde.determinant())/2;
-      ++j;
-      //cout << " UV " << endl;
-      //cout << EE << endl;
-      //cout << " local 3D " << endl;
-      //cout << EE_tilde << endl;
-      //cout << " Jacobian " << endl;
-      //cout << J.block(idx*2,0,2,2) << endl;
-      //cout << " area: " << areas(idx) << endl;
+      ++i;
+      ++idx;
+      edgevec_before1=edgevec1;
     }
   }
+  return len1 - seg_len1;
 }
 
 
@@ -862,7 +884,7 @@ bool compareVectors(const pair<vector<gcs::SurfacePoint>, double >& a, const pai
 }
   
 
-double calc_energy(gcs::Halfedge he){
+double calc_energy(gcs::Halfedge &he){
   gcs::Halfedge he1 = he;
   gcs::Halfedge he2 = he1.next();
   gcs::Halfedge he3 = he2.next();
@@ -874,21 +896,51 @@ double calc_energy(gcs::Halfedge he){
   vec[1].second = data_mesh.intTri->edgeLengths[he2.edge()];
   vec[2].second = data_mesh.intTri->edgeLengths[he3.edge()];
   sort(vec.begin(), vec.end(), compareVectors);
-  //cout << " intrinsic sizes " << endl;
-  //cout << vec[0].first.size() << "  " << vec[1].first.size() << "  " << vec[2].first.size() << endl;
+  cout << " intrinsic sizes " << endl;
+  cout << vec[0].first.size() << "  " << vec[1].first.size() << "  " << vec[2].first.size() << endl;
   int i = 0;
   int j =0 ;
   if(vec[2].first[0] == vec[1].first.back()){
+    reverse(vec[1].first.begin(),vec[1].first.end());
+  }
+  else{
     reverse(vec[2].first.begin(),vec[2].first.end());
   }
-
   MatrixXd J;
   VectorXd areas;
-  triangle(vec[2].first,vec[1].first, vec[2].second, vec[1].second, vec[0].second, J, areas);
+  // cout << "start vertices: " <<vec[1].first[0] << "  " << vec[2].first[0] << endl; 
+  double new_seglen = triangle(vec[2].first, vec[1].first, vec[2].second, vec[1].second, vec[0].second, false, J, areas);
   double total_energy = 0;
   for(int i = 0; i<areas.size(); ++i){
     Matrix2d temp = J.block(i*2,0,2,2);
     total_energy += areas(i) * energy(temp);
+  }
+  //cout << " first done " << endl;
+  // cout << total_energy << endl;
+  if(vec[2].first.back() == vec[0].first.back()){
+    reverse(vec[0].first.begin(), vec[0].first.end());
+  }
+   double len3 = (V.transpose()*(b(vec[1].first.back())-b(vec[2].first[vec[1].first.size()-1]))).norm();
+  reverse(vec[2].first.begin(), vec[2].first.end());
+  if(vec[2].first.size()!=vec[1].first.size()){
+   // cout << " second in " << endl;
+    vector<gcs::SurfacePoint> new_seg(vec[2].first.begin(),vec[2].first.begin()+vec[2].first.size()-vec[1].first.size()+1);
+    //cout << new_seg.size() << "   " << vec[0].first.size() << endl;
+    // cout << "start vertices 2: " <<vec[0].first[0] << "  " << new_seg[0] << endl; 
+    cout << new_seglen << "  " << vec[0].second << "  " << len3 << endl;
+    // TODO sometimes this is not a triangle, check!!
+    if(new_seg.size()>vec[0].first.size()){
+      triangle(new_seg, vec[0].first, new_seglen, vec[0].second, len3, true, J, areas);
+    }
+    else{
+      triangle(vec[0].first, new_seg, vec[0].second, new_seglen, len3, true, J, areas);
+    }
+   // cout << " second done " << endl;
+    for(int i = 0; i<areas.size(); ++i){
+      Matrix2d temp = J.block(i*2,0,2,2);
+      total_energy += areas(i) * energy(temp);
+    }
+  //  cout << total_energy << endl;
   }
   return total_energy;
 }
@@ -1015,20 +1067,23 @@ unsigned flipThroughEdges_new(){
   data_mesh.intTri->requireFaceAreas();
   //while(true){
     unsigned totalflips = 0;
-    double energy_before=0, energy_after=0;
+    /*double energy_before=0, energy_after=0;
     for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
       energy_before+= calc_energy(face.halfedge());
-    }
+    }*/
     for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
       if(e.isBoundary()) continue;
-      double before = calc_energy(e.halfedge()) + calc_energy(e.halfedge().twin());
+      gcs::Halfedge h1 = e.halfedge();
+      gcs::Halfedge h2 = h1.twin();
+      double before = calc_energy(h1) + calc_energy(h2);
       cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
       data_mesh.intTri->flipEdgeIfPossible(e);
       //cout << " after flip " << endl;
       cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
-      gcs::Edge flipped = e;
+      h1= e.halfedge();
+      h2= h1.twin();
       //cout << " after finding the flipped edge" << endl;
-      double after = calc_energy(flipped.halfedge()) + calc_energy(flipped.halfedge().twin()); 
+      double after = calc_energy(h1)+ calc_energy(h2); 
       cout << " energies: " << before << " -> " << after << endl;
       double tolerance = 1e-6; // set tolerance to 1e-6 
 
@@ -1038,22 +1093,23 @@ unsigned flipThroughEdges_new(){
           cout << "flipped diff:  " << before - after << endl;
         }
         else {
-          data_mesh.intTri->flipEdgeIfPossible(flipped);
+          data_mesh.intTri->flipEdgeIfPossible(e);
         }
       }
       else {
-        data_mesh.intTri->flipEdgeIfPossible(flipped);
+        data_mesh.intTri->flipEdgeIfPossible(e);
         
 
       }
 
     //if(totalflips==0) break;
     }
+    /*
     for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
       energy_after+= calc_energy(face.halfedge()); 
-    }
+    }*/
   cout << " totalflips: " << totalflips << endl;
-  cout << " ENERGY: " << energy_before << "  -->  " << energy_after << endl;
+  //cout << " ENERGY: " << energy_before << "  -->  " << energy_after << endl;
  /* for(int i : visited){
     cout << i << endl;
   } */
@@ -1473,7 +1529,7 @@ void intrinsicEdges(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri, 
   */
   for(gcs::Edge e : intTri->intrinsicMesh->edges()) {
     std::vector<gcs::SurfacePoint> pointVec = intTri->traceIntrinsicHalfedgeAlongInput(e.halfedge());
-    if(pointVec.size()==2) continue;
+    //if(pointVec.size()==2) continue;
     for (int k = 0; k < pointVec.size(); k++) {
       points.push_back(V.transpose()*b(pointVec[k]));
       if (k == 0) continue;
@@ -1506,7 +1562,54 @@ void intrinsicEdges(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri, 
   }
 }
 
-
+void intrinsicEdgesUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri, const Eigen::MatrixXd& UV, Eigen::MatrixXd& P1, Eigen::MatrixXd& P2, MatrixXd& colors) {
+  vector<Eigen::Vector2d> points;
+  vector<array<int,2> > edges;
+  /*
+  for(gcs::Edge e : data_mesh.inputMesh->edges()){
+    points.push_back(V.row(e.firstVertex().getIndex()).transpose());
+    points.push_back(V.row(e.secondVertex().getIndex()).transpose());
+    int t = points.size();
+    std::array<int, 2> tmp{t-2, t-1};
+    edges.push_back(tmp);
+    
+  }
+  int ne = edges.size();
+  */
+  for(gcs::Edge e : intTri->intrinsicMesh->edges()) {
+    std::vector<gcs::SurfacePoint> pointVec = intTri->traceIntrinsicHalfedgeAlongInput(e.halfedge());
+    if(pointVec.size()==2) continue;
+    for (int k = 0; k < pointVec.size(); k++) {
+      points.push_back(UV.transpose()*b(pointVec[k]));
+      if (k == 0) continue;
+      int t = points.size();
+      std::array<int, 2> tmp{t-2, t-1};
+      edges.push_back(tmp);
+    }
+  }
+  P1.resize(edges.size(),2);
+  P2.resize(edges.size(),2);
+  /*
+  for(int i = 0; i< points.size();++i){
+    P.row(i) = points[i].transpose();
+  }
+  E.resize(edges.size(),2);
+  */
+  int i = 0;
+  for(auto e : edges){
+    P1.row(i) = points[e[0]].transpose();
+    P2.row(i) = points[e[1]].transpose();
+    i++;
+  }
+  colors.resize(edges.size(),3);
+  /*
+  for(int j = 0; j < ne; ++j){
+    colors.row(j) = Eigen::RowVector3d(0.5,0.5,0);
+  }*/
+  for(int j = 0; j < edges.size(); ++j){
+    colors.row(j) = Eigen::RowVector3d(1,0,0);
+  }
+}
 bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 	switch (key) {
   case '1':
@@ -1635,17 +1738,19 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       if(option_en==1) energy=symmetricDrichlet;
       if(option_en==2) energy=asap;
       if(option_en==3) energy=arap;
-      double total_energy = 0;
-      for(gcs::Halfedge he : data_mesh.intTri->intrinsicMesh->halfedges()){
-        total_energy += calc_energy(he);
-      }
-      cout << "before: " << total_energy << endl;
+      double total_energy_b = 0;
+      /*for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+        total_energy_b += calc_energy(f.halfedge());
+      }*/
       flipThroughEdges_new();
-      total_energy = 0;
-      for(gcs::Halfedge he : data_mesh.intTri->intrinsicMesh->halfedges()){
-        total_energy += calc_energy(he);
+      /*
+      double total_energy = 0;
+      for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+        total_energy += calc_energy(f.halfedge());
       }
-      cout << "after: " << total_energy << endl;;
+      cout << "before: " << total_energy_b << endl;
+      cout << "after: " << total_energy << endl;
+      */
     }
     break;
   case 'v':
@@ -1661,11 +1766,30 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
         C.row(i) = colored_points[i].transpose();
       }
       viewer.data().point_size = 12;    
-      viewer.data().add_points(C, Eigen::RowVector3d(0, 0, 1));
+      //viewer.data().add_points(C, Eigen::RowVector3d(0, 0, 1));
       viewer.data().add_edges(P1, P2, colors);
       viewer.data().show_faces=true;
       break;
     }
+  case 't' :
+    {
+    if(UV.size()==0)
+      computeParameterization('2');
+      
+    double energy_total_before = 0;
+    for(gcs::Face f: data_mesh.intTri->intrinsicMesh->faces()){
+      gcs::Halfedge he = f.halfedge();
+      energy_total_before+= calc_energy(he);
+    }
+    data_mesh.intTri->flipToDelaunay();
+
+    double energy_total = 0;
+    for(gcs::Face f: data_mesh.intTri->intrinsicMesh->faces()){
+      gcs::Halfedge he = f.halfedge();
+      energy_total += calc_energy(he);
+    }
+    cout << " before: " << energy_total_before << "  ->   after: " << energy_total << endl;
+  }
 	case '+':
 		TextureResolution /= 2;
 		break;
@@ -1685,13 +1809,23 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       {
         temp3D = viewer.core();
         viewer.core() = temp2D;
+        viewer.data().show_texture = false;
+		    viewer.data().set_mesh(UV, F);
         showingUV = true;
+        Eigen::MatrixXd P1, P2,C;
+        Eigen::MatrixXi E;
+        intrinsicEdgesUV(data_mesh.intTri, UV, P1, P2, colors);
+        viewer.data().add_edges(P1, P2, RowVector3d(1,0,0));
+        for(gcs::Halfedge he : data_mesh.intTri->intrinsicMesh->halfedges()){
+          calc_energy(he);
+          viewer.data().add_edges(C1,C2,colors);
+        }
       }
       else { std::cout << "ERROR ! No valid parameterization\n"; }
     }
     break;
 	}
-	if(key!='v') Redraw();	
+	if(key!='v' && key!=' ' ) Redraw();	
 	return true;
 }
 
