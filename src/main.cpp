@@ -920,7 +920,7 @@ double calc_energy(gcs::Halfedge &he){
   if(vec[2].first.back() == vec[0].first.back()){
     reverse(vec[0].first.begin(), vec[0].first.end());
   }
-   double len3 = (V.transpose()*(b(vec[1].first.back())-b(vec[2].first[vec[1].first.size()-1]))).norm();
+  double len3 = (V.transpose()*(b(vec[1].first.back())-b(vec[2].first[vec[1].first.size()-1]))).norm();
   reverse(vec[2].first.begin(), vec[2].first.end());
   if(vec[2].first.size()!=vec[1].first.size()){
    // cout << " second in " << endl;
