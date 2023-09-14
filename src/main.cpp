@@ -794,6 +794,11 @@ void nextt(gcs::Halfedge &he, bool isInputEdge, vector<gcs::SurfacePoint> &res){
 */
 
 
+Vector2d c(vector<gcs::SurfacePoint> &vec, double t){
+  return UV.transpose()*b(vec[0])*(1-t) + UV.transpose()*b(vec.back())*t;
+}
+
+
 double triangle_c(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, double len1, double len2, double len3, bool complete, MatrixXd &J, VectorXd &areas){
   vector<double> tvalues1 = data_mesh.intTri->recoverTraceTValues(vec1);
   vector<double> tvalues2 = data_mesh.intTri->recoverTraceTValues(vec2);
@@ -820,7 +825,7 @@ double triangle_c(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& ve
   Vector2d edgevec_before2 = tvalues2[j+1] * E_tilde.col(1);
   // add first triangle 
   EE_tilde << edgevec_before1, edgevec_before2;
-  EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j+1])-b(vec1[i]));
+  EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j+1]) - c(vec1,tvalues1[i]);
   J.block(0,0,2,2) << EE * EE_tilde.inverse();
   areas(0) = abs(EE_tilde.determinant())/2;
   P1.row(0) = b(vec1[i+1]).transpose() * UV; 
@@ -832,11 +837,13 @@ double triangle_c(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& ve
     edgevec1 = tvalues1[i+1] * E_tilde.col(0);
     edgevec2 = tvalues2[j+1] * E_tilde.col(1);
     EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
-    EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j])-b(vec1[i]));
+    EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j]) - c(vec1,tvalues1[i]);
+
     J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
     areas(idx) = abs(EE_tilde.determinant())/2;
     EE_tilde << (edgevec_before2-edgevec2), (edgevec1-edgevec2);
-    EE << UV.transpose()*(b(vec2[j])-b(vec2[j+1])), UV.transpose()*(b(vec1[i+1])-b(vec2[j+1]));
+    EE << c(vec2, tvalues2[j]) - c(vec2,tvalues2[j+1]), c(vec1,tvalues1[i+1]) - c(vec2,tvalues2[j+1]);
+
     J.block(idx*2+2,0,2,2) << EE * EE_tilde.inverse();
     areas(idx+1) = abs(EE_tilde.determinant())/2;
 
@@ -855,7 +862,7 @@ double triangle_c(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& ve
     while(i<vec1.size()-1){
       edgevec1 = tvalues1[i+1] * E_tilde.col(0);
       EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
-      EE << UV.transpose()*(b(vec1[i+1])-b(vec1[i])), UV.transpose()*(b(vec2[j])-b(vec1[i]));
+      EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j]) - c(vec1,tvalues1[i]);
       J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
       areas(idx) = abs(EE_tilde.determinant())/2;
       P1.row(idx) = UV.transpose()*b(vec1[i+1]);
@@ -976,7 +983,7 @@ bool compareVectors(const pair<vector<gcs::SurfacePoint>, double >& a, const pai
 }
   
 
-double calc_energy(gcs::Halfedge &he){
+double calc_energy(gcs::Halfedge he){
   gcs::Halfedge he1 = he;
   gcs::Halfedge he2 = he1.next();
   gcs::Halfedge he3 = he2.next();
@@ -1254,15 +1261,15 @@ unsigned flipThroughEdges_new(){
       gcs::Halfedge h1 = e.halfedge();
       gcs::Halfedge h2 = h1.twin();
       double before = calc_energy(h1) + calc_energy(h2);
-      cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
+      //cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
       data_mesh.intTri->flipEdgeIfPossible(e);
       //cout << " after flip " << endl;
-      cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
+      //cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
       h1= e.halfedge();
       h2= h1.twin();
       //cout << " after finding the flipped edge" << endl;
       double after = calc_energy(h1)+ calc_energy(h2); 
-      cout << " energies: " << before << " -> " << after << endl;
+      //cout << " energies: " << before << " -> " << after << endl;
       double tolerance = 1e-6; // set tolerance to 1e-6 
 
       if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
@@ -1938,18 +1945,18 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       if(option_en==2) energy=asap;
       if(option_en==3) energy=arap;
       double total_energy_b = 0;
-      /*for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+      for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         total_energy_b += calc_energy(f.halfedge());
-      }*/
+      }
       flipThroughEdges_new();
-      /*
+      
       double total_energy = 0;
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         total_energy += calc_energy(f.halfedge());
       }
       cout << "before: " << total_energy_b << endl;
       cout << "after: " << total_energy << endl;
-      */
+      
     }
     break;
   case 'v':
@@ -1993,17 +2000,17 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       computeParameterization('2');
       
     double energy_total_before = 0;
-    for(gcs::Face f: data_mesh.inputMesh->faces()){
+    for(gcs::Face f: data_mesh.intTri->intrinsicMesh->faces()){
       gcs::Halfedge he = f.halfedge();
-      energy_total_before+= calc_energy_intri(he);
+      energy_total_before+= calc_energy(he);
     }
     //flipThroughEdges();
     data_mesh.intTri->flipToDelaunay();
 
     double energy_total = 0;
-    for(gcs::Face f: data_mesh.inputMesh->faces()){
+    for(gcs::Face f: data_mesh.intTri->intrinsicMesh->faces()){
       gcs::Halfedge he = f.halfedge();
-      energy_total += calc_energy_intri(he);
+      energy_total += calc_energy(he);
     }
     cout << " before: " << energy_total_before << "  ->   after: " << energy_total << endl;
     break;
