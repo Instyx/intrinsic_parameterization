@@ -78,7 +78,7 @@ MatrixXd colors;
 MatrixXd C1, P1;
 MatrixXd C2, P2;
 vector<Eigen::Vector3d> colored_points;
-unsigned iterations=1;
+unsigned iterations=0;
 void Redraw()
 {
 	viewer.data().clear();
@@ -86,6 +86,7 @@ void Redraw()
 	if (!showingUV)
 	{
 		viewer.data().set_mesh(V, F);
+
 		viewer.data().set_face_based(false);
 
     if(UV.size() != 0)
@@ -403,9 +404,33 @@ Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
   return result;
 }
 
+double cross2d(Vector2d &v1, Vector2d &v2){
+  return v1(0)*v2(1)-v1(1)*v2(0);
+}
+
+// the points are in order with the polygon rotation
+bool isConcave(vector<Vector2d>& points){
+  Vector2d e1 = points[1]-points[0];
+  Vector2d e2 = points[2]-points[1];
+  Vector2d e3 = points[3]-points[2];
+  Vector2d e4 = points[0]-points[3];
+  
+  double cross1 = cross2d(e1,e2);
+  double cross2 = cross2d(e2,e3);
+  double cross3 = cross2d(e3,e4);
+  double cross4 = cross2d(e4,e1);
+
+  if (cross1 * cross2 > 0 || cross2 * cross3 > 0 || cross3 * cross4 > 0) {
+    return false;
+  }
+    
+    return true;
+}
+
+
 
 // TODO check whether the order of edges change the Jacobian
-void diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
+bool diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
   std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
   double fi_len1 = data_mesh.intTri->edgeLengths[e];
   double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
@@ -427,8 +452,16 @@ void diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
   size_t v4 = data_mesh.intTri->vertexIndices[halfedges[2].tipVertex()];
-  
+ 
+  vector<Vector2d> points(4);
+  points[0] = UV.row(v1).transpose();
+  points[1] = UV.row(v4).transpose();
+  points[2] = UV.row(v2).transpose();
+  points[3] = UV.row(v3).transpose();
   //cout << "intri:   "<< data_mesh.inputGeometry->vertexPositions[v1] << ";  start mesh" << V.row(v1) << endl;
+
+  // if concave the intrinsic flip is not possible
+  if(isConcave(points)) return false;
 
   E1 << UV(v2,0) - UV(v1,0), UV(v3,0) - UV(v1,0),
         UV(v2,1) - UV(v1,1), UV(v3,1) - UV(v1,1);
@@ -437,6 +470,7 @@ void diamondJacobians(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
   J1 = E1 * E1_tilde.inverse();
   J2 = E2 * E2_tilde.inverse();
   
+  return true;
 }
 
 void faceJacobian(gcs::Face &f, Matrix2d &J){
@@ -480,7 +514,6 @@ void triangleJacobian(std::vector<gcs::SurfacePoint> &vec, Matrix2d &J){
 
   
 }
-
 
 Vector2d c(vector<gcs::SurfacePoint> &vec, double t){
   return UV.transpose()*b(vec[0])*(1-t) + UV.transpose()*b(vec.back())*t;
@@ -859,9 +892,11 @@ void diamondJacobians_uv(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
 */
 
 double flippeddiff(gcs::Edge e){
+  if(e.isBoundary()) return 0;
   gcs::Face f1 = e.halfedge().face(); 
   gcs::Face f2 = e.halfedge().twin().face();
   Matrix2d J1, J2, J1_prime, J2_prime;
+
   diamondJacobians(e, J1, J2);
   double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                   energy(J2) * data_mesh.intTri->faceArea(f2);
@@ -871,17 +906,51 @@ double flippeddiff(gcs::Edge e){
   //cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
   gcs::Edge flipped = e;
   //cout << " after finding the flipped edge" << endl;
-  diamondJacobians(flipped, J1_prime, J2_prime);
-  // if one of the determinants is negative, then the axis of the triangle got different direction
-  if(J1_prime.determinant()<0 || J2_prime.determinant()<0){
-      data_mesh.intTri->flipEdgeIfPossible(flipped);
-      return 0;
+
+  // if flip is not possible flip it back and return 0
+  if(!diamondJacobians(flipped, J1_prime, J2_prime)){
+    data_mesh.intTri->flipEdgeIfPossible(flipped);
+    return 0;
   }
+
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
   data_mesh.intTri->flipEdgeIfPossible(flipped);
   return after-before;
 }
 
+
+unsigned greedyflip(){
+  unsigned totalflips=0;
+  gcs::EdgeData<double> diffs(* (data_mesh.intTri->intrinsicMesh));
+  vector<size_t> indices(diffs.size());
+  vector<int> visited(diffs.size());
+  int i=0;
+  for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
+    double energydiff = flippeddiff(e);
+    diffs[e] = energydiff;
+    indices[i]= e.getIndex();
+    ++i;
+  }
+  sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
+    return diffs[i] < diffs[j];
+    });
+  for (size_t i = 0; i < diffs.size(); i++) {
+    size_t idx = indices[i];
+    if(diffs[idx]>=0) break;
+    if(visited[idx]) continue;
+    gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+    visited[idx]=1;
+    visited[halfedges[0].edge().getIndex()]=1;
+    visited[halfedges[1].edge().getIndex()]=1;
+    visited[halfedges[2].edge().getIndex()]=1;
+    visited[halfedges[3].edge().getIndex()]=1;
+    ++totalflips;
+  }
+  cout << " totalflips: " << totalflips << endl;
+  return totalflips;
+}
 
 
 unsigned flipThroughEdges(){
@@ -918,13 +987,13 @@ unsigned flipThroughEdges(){
           continue;
       }
       double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
-      cout << " energies: " << before << " -> " << after << endl;
+      //cout << " energies: " << before << " -> " << after << endl;
       double tolerance = 1e-6; // set tolerance to 1e-6 
 
       if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
         if (before > after) {
           totalflips++;
-          cout << "flipped diff:  " << before - after << endl;
+          // cout << "flipped diff:  " << before - after << endl;
         }
         else {
           data_mesh.intTri->flipEdgeIfPossible(flipped);
@@ -1005,6 +1074,26 @@ unsigned flipThroughEdges_new(){
   } */
   return totalflips;
 }
+
+// TODO:: for the face jacobian, try to use a function from igl and check if the determinants are
+// still negative
+double compute_total_energy(){
+  double total_energy = 0;
+  int flipped_triangles = 0;
+  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+    Matrix2d J;
+    faceJacobian(f, J);
+    if(J.determinant()<0){
+      //cout << " determinant negative " << endl;
+      flipped_triangles++;
+    }
+    total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+  }
+  cout << " number flipped triangles: " << flipped_triangles << endl;
+  cout << " total triangles: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
+ return total_energy;
+}
+
 void computeParameterizationIntrinsic(int type){
   cout << "in parameterization" << endl;
 	SparseMatrix<double> A;
@@ -1171,7 +1260,7 @@ void computeParameterizationIntrinsic(int type){
 void computeParameterization(int type)
 {
   cout << "in parameterization" << endl;
-  if(igrad && UV.size()!=0) flipThroughEdges();
+  if(igrad && UV.size()!=0) while(greedyflip());
 	SparseMatrix<double> A;
 	VectorXd b;
 	Eigen::SparseMatrix<double> C;
@@ -1330,7 +1419,9 @@ void computeParameterization(int type)
 		// Then construct the matrix with the given rotation matrices
 		
 		if(UV.size()==0) {
+      cout <<  " start UV " << endl;
 			computeParameterization('3');
+      cout << " total energy: " << compute_total_energy() << endl;
 		}
 		VectorXd areas;
 		SparseMatrix<double> Dx, Dy;
@@ -1347,10 +1438,12 @@ void computeParameterization(int type)
 		VectorXd Dxv = Dx * UV.col(1);		
 		VectorXd Dyu = Dy * UV.col(0);		
 		VectorXd Dyv = Dy * UV.col(1);
-		MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix 
+		MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix
+    int flipped_triangles = 0;
 		for (int i = 0; i < F.rows(); ++i) {
 			Matrix2d J, U, S, VV;
 			J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+      if(J.determinant()<0) ++flipped_triangles;
 			SSVD2x2(J, U, S, VV);
 			Matrix2d R = U*VV.transpose();
 			RR(i,0) = R(0,0);
@@ -1358,6 +1451,7 @@ void computeParameterization(int type)
 			RR(i,2) = R(1,0);
 			RR(i,3) = R(1,1);
 		}		
+    cout << " flippo: " << flipped_triangles << endl;
 		b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
 		Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
 
@@ -1397,8 +1491,11 @@ void computeParameterization(int type)
 	UV.resize(V.rows(),2);
 	UV.col(0) = x.segment(0,V.rows());
  	UV.col(1) = x.segment(V.rows(),V.rows());
+  double en = compute_total_energy();
+  cout << " total energy: " << en << endl;
   cout << "end" << endl;
  	prevFreeBoundary = freeBoundary;
+
 }
 
 void intrinsicUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri){
@@ -1522,16 +1619,17 @@ void intrinsicEdgesUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri
   }
 }
 bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
+  if(option_en==0) energy=drichlet;
+  if(option_en==1) energy=symmetricDrichlet;
+  if(option_en==2) energy=asap;
+  if(option_en==3) energy=arap;
+
 	switch (key) {
   case '1':
 	case '2':
 	case '3':
 	case '4':
 	case '5':
-    if(option_en==0) energy=drichlet;
-    if(option_en==1) energy=symmetricDrichlet;
-    if(option_en==2) energy=asap;
-    if(option_en==3) energy=arap;
 		reset=true;
 		if(key=='4'){
 			unsigned its = iterations;
@@ -1645,10 +1743,6 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       if(UV.size()==0)
         computeParameterization('2');
       cout << " starting flipping " << endl;
-      if(option_en==0) energy=drichlet;
-      if(option_en==1) energy=symmetricDrichlet;
-      if(option_en==2) energy=asap;
-      if(option_en==3) energy=arap;
       double total_energy_b = 0;
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
@@ -1658,6 +1752,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       }
       flipThroughEdges();
       //data_mesh.intTri->flipToDelaunay();
+      data_mesh.intTri->refreshQuantities();
       double total_energy = 0;
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
@@ -1670,6 +1765,34 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       
     }
     break;
+  case 'g':
+    {
+      cout << " g " << endl; 
+      if(UV.size()==0)
+        computeParameterization('2');
+      cout << " starting flipping " << endl;
+      double total_energy_b = 0;
+      for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+        Matrix2d J;
+        faceJacobian(f, J);
+        if(J.determinant()<0) continue;
+        total_energy_b += energy(J)*data_mesh.intTri->faceAreas[f];
+      }
+      greedyflip();
+      data_mesh.intTri->refreshQuantities();
+      double total_energy = 0;
+      for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+        Matrix2d J;
+        faceJacobian(f, J);
+        if(J.determinant()<0) continue;
+        total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+      }
+      cout << "before: " << total_energy_b << endl;
+      cout << "after: " << total_energy << endl;
+      
+    }
+    break;
+
   case 'v':
     {
       Eigen::MatrixXd C;
@@ -1710,11 +1833,6 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     if(UV.size()==0)
       computeParameterization('2');
     
-    if(option_en==0) energy=drichlet;
-    if(option_en==1) energy=symmetricDrichlet;
-    if(option_en==2) energy=asap;
-    if(option_en==3) energy=arap;
-
     double energy_total_before = 0;
     for(gcs::Face f: data_mesh.intTri->intrinsicMesh->faces()){
       gcs::Halfedge he = f.halfedge();
@@ -1731,6 +1849,25 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     cout << " before: " << energy_total_before << "  ->   after: " << energy_total << endl;
     break;
   }
+  case 'c':
+    {
+    // compute the total energy w.r.t to the actual UV 
+
+      double total_energy = 0;
+      for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+        Matrix2d J;
+        faceJacobian(f, J);
+        if(J.determinant()<0){
+          //cout << " determinant negative " << endl;
+          total_energy += calc_energy(f.halfedge());
+        }
+        else{
+          total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+        }
+      }
+      cout << " total_energy = " << total_energy << endl;
+      break;
+    }
 	case '+':
 		TextureResolution /= 2;
 		break;
