@@ -918,6 +918,24 @@ double flippeddiff(gcs::Edge e){
   return after-before;
 }
 
+double compute_total_energy(){
+  double total_energy = 0;
+  int flipped_triangles = 0;
+  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+    Matrix2d J;
+    faceJacobian(f, J);
+    if(J.determinant()<0){
+      //cout << " determinant negative " << endl;
+      flipped_triangles++;
+    }
+    total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+  }
+  cout << " number flipped triangles: " << flipped_triangles << endl;
+  cout << " total triangles: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
+ return total_energy;
+}
+
+
 
 unsigned greedyflip(){
   unsigned totalflips=0;
@@ -957,67 +975,48 @@ unsigned flipThroughEdges(){
   assert(UV.size()!=0 && "Computer parameterization first!!");
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
-  //while(true){
-  // TODO: compute the before and the after energy per face and not in this function per edge
-    unsigned totalflips = 0;
-    /*double energy_before=0, energy_after=0;
-    for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
-      Matrix2d J;
-      faceJacobian(face,J);
-      energy_before+= energy(J) * data_mesh.intTri->faceArea(face);
-    }*/
-    for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
-      if(e.isBoundary()) continue;
-      gcs::Face f1 = e.halfedge().face(); 
-      gcs::Face f2 = e.halfedge().twin().face();
-      Matrix2d J1, J2, J1_prime, J2_prime;
-      diamondJacobians(e, J1, J2);
-      double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
-                      energy(J2) * data_mesh.intTri->faceArea(f2);
-      //cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
-      data_mesh.intTri->flipEdgeIfPossible(e);
-      //cout << " after flip " << endl;
-      //cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
-      gcs::Edge flipped = e;
-      //cout << " after finding the flipped edge" << endl;
-      diamondJacobians(flipped, J1_prime, J2_prime);
-      // if one of the determinants is negative, then the axis of the triangle got different direction
-      if(J1_prime.determinant()<0 || J2_prime.determinant()<0){
-          data_mesh.intTri->flipEdgeIfPossible(flipped);
-          continue;
-      }
-      double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
-      //cout << " energies: " << before << " -> " << after << endl;
-      double tolerance = 1e-6; // set tolerance to 1e-6 
+  unsigned totalflips = 0;
+  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+    if(e.isBoundary()) continue;
+    gcs::Face f1 = e.halfedge().face(); 
+    gcs::Face f2 = e.halfedge().twin().face();
+    Matrix2d J1, J2, J1_prime, J2_prime;
+    diamondJacobians(e, J1, J2);
+    double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
+                    energy(J2) * data_mesh.intTri->faceArea(f2);
+    //cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    //cout << " after flip " << endl;
+    //cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
+    gcs::Edge flipped = e;
+    //cout << " after finding the flipped edge" << endl;
+    if(!diamondJacobians(flipped, J1_prime, J2_prime)){
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+      continue;
+    }
+    // if one of the determinants is negative, then the axis of the triangle got different direction
+    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+    //cout << " energies: " << before << " -> " << after << endl;
+    double tolerance = 1e-6; // set tolerance to 1e-6 
 
-      if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
-        if (before > after) {
-          totalflips++;
-          // cout << "flipped diff:  " << before - after << endl;
-        }
-        else {
-          data_mesh.intTri->flipEdgeIfPossible(flipped);
-        }
+    if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
+      if (before > after) {
+        totalflips++;
+        // cout << "flipped diff:  " << before - after << endl;
       }
       else {
         data_mesh.intTri->flipEdgeIfPossible(flipped);
       }
+    }
+    else {
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+    }
 
-    //if(totalflips==0) break;
-    }
-    data_mesh.intTri->refreshQuantities();
-    /*
-    for (gcs::Face face : data_mesh.intTri->intrinsicMesh->faces() ){
-      Matrix2d J;
-      faceJacobian(face,J);
-      energy_after+= energy(J) * data_mesh.intTri->faceArea(face);
-    }
-  cout << " ENERGY: " << energy_before << "  -->  " << energy_after << endl;
-  */
+  }
+  data_mesh.intTri->refreshQuantities();
+  double en = compute_total_energy();
+  cout << " energy after flippings: " << en << endl;
   cout << " totalflips: " << totalflips << endl;
- /* for(int i : visited){
-    cout << i << endl;
-  } */
   return totalflips;
 }
 unsigned flipThroughEdges_new(){
@@ -1075,192 +1074,10 @@ unsigned flipThroughEdges_new(){
   return totalflips;
 }
 
-// TODO:: for the face jacobian, try to use a function from igl and check if the determinants are
-// still negative
-double compute_total_energy(){
-  double total_energy = 0;
-  int flipped_triangles = 0;
-  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
-    Matrix2d J;
-    faceJacobian(f, J);
-    if(J.determinant()<0){
-      //cout << " determinant negative " << endl;
-      flipped_triangles++;
-    }
-    total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
-  }
-  cout << " number flipped triangles: " << flipped_triangles << endl;
-  cout << " total triangles: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
- return total_energy;
-}
-
-void computeParameterizationIntrinsic(int type){
-  cout << "in parameterization" << endl;
-	SparseMatrix<double> A;
-	VectorXd b;
-	Eigen::SparseMatrix<double> C;
-	VectorXd d;
-	// Find the indices of the boundary vertices of the mesh and put them in fixed_UV_indices
-
-	// prevFreeBoundary is used so that contraints do not need to be computed each time since they are the same
-	// and brute force is expensive
-	if(prevFreeBoundary!=freeBoundary||fixed_UV_indices.size()==0){
-		if (!freeBoundary)
-		{
-			// The boundary vertices should be fixed to positions on the unit disc. Find these position and
-			// save them in the #V x 2 matrix fixed_UV_position.
-			igl::boundary_loop(F, fixed_UV_indices);
-			igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
-		}
-		else{
-			// Fix two UV vertices. This should be done in an intelligent way. Hint: The two fixed vertices should be the two most distant one on the mesh.
-			
-			// brute force to find most distant 2 vertices
-			unsigned fixed1 = 0, fixed2 = 0;
-			for (unsigned i = 0; i < V.rows(); ++i) {
-				for (unsigned j = 0; j < V.rows(); ++j) {
-					if((V.row(i)-V.row(j)).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
-						fixed1 = i;
-						fixed2 = j;
-					}
-				}
-			}
-			fixed_UV_indices.resize(2);
-			fixed_UV_positions.resize(2,2);
-			fixed_UV_indices << fixed1, fixed2;
-			fixed_UV_positions << 1,0,0,1;
-			cout << fixed_UV_indices.size() << endl;
-			cout << fixed_UV_positions << endl;
-
-	  }
-	}
-	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions, C, d); 
-
-
-	A.resize(2*V.rows(),2*V.rows());
-  b.resize(2*V.rows());
-  if(type=='1'){
-    data_mesh.intTri->requireCotanLaplacian();
-    SparseMatrix<double> L = data_mesh.intTri->cotanLaplacian;
-    vector<Triplet<double> > tlist;
-		for (int i = 0; i < L.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value())); 
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
-			}
-		}
-		A.setFromTriplets(tlist.begin(), tlist.end());		
-		b = VectorXd::Zero(2*V.rows());
-  }
-
-  if(type=='2'){
-		// Add your code for computing the system for LSCM parameterization
-		// Note that the libIGL implementation is different than what taught in the tutorial! Do not rely on it!!
-		
-		SparseMatrix<double> Dx, Dy;
-		VectorXd areas(F.rows());
-		computeGrad_intrinsic(Dx,Dy,areas);
-		// A = (DxADx + DyADy    DxADy - DyADx)
-		//     (-DxADy + DyADx   DxADx + DyADy)
-		SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-		SparseMatrix<double> B2 = Dx.transpose()*areas.asDiagonal()*Dy - Dy.transpose()*areas.asDiagonal()*Dx;
-    cout << "as" << endl;
-		vector<Triplet<double> > tlist;
-		for (int i = 0; i < B1.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value()));
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
-			}
-		}
-  
-
-		for (int i = 0; i < B2.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B2,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col(), it.value()));
-				tlist.push_back(Triplet<double>(it.row(), it.col()+V.rows(), -it.value()));
-			}
-		}		
-		A.setFromTriplets(tlist.begin(), tlist.end());
-		b = VectorXd::Zero(2*V.rows());
-  }
-
-
-  if(type=='3'){
-    if(UV.size()==0) computeParameterizationIntrinsic('1');
-    data_mesh.intTri->requireFaceIndices();
-    
-    SparseMatrix<double> Dx, Dy, G;
-    VectorXd areas(F.rows());
-    MatrixXd lengths(F.rows(),3);
-
-
-    //while(flipThroughEdges());
-
-    unsigned before= 0;
-    unsigned curr = flipThroughEdges();
-    while(before!=curr){
-      before = curr;
-      curr = flipThroughEdges();
-    }
-
-    computeGrad_intrinsic(Dx, Dy, areas);
-    VectorXd Dxu = Dx * UV.col(0);		
-		VectorXd Dxv = Dx * UV.col(1);		
-		VectorXd Dyu = Dy * UV.col(0);		
-		VectorXd Dyv = Dy * UV.col(1);
-		MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix 
-    for (int i = 0; i < F.rows(); ++i) {
-			Matrix2d J, U, S, VV;
-			J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-			SSVD2x2(J, U, S, VV);
-			Matrix2d R = U*VV.transpose();
-			RR(i,0) = R(0,0);
-			RR(i,1) = R(0,1);
-			RR(i,2) = R(1,0);
-			RR(i,3) = R(1,1);
-		}		
-		b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
-		Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
-
-		SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-
-		vector<Triplet<double> > tlist;
-		for (int i = 0; i < B1.outerSize(); ++i) {
-			for (SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
-				tlist.push_back(Triplet<double>(it.row(), it.col(), it.value()));
-				tlist.push_back(Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
-			}
-		}
-		A.setFromTriplets(tlist.begin(), tlist.end());
-  }
-	// build (A C^t; C 0)
-	SparseMatrix<double> Ct, temp1, temp2, res;
-	Ct = C.transpose();
-	igl::cat(2, A, Ct, temp1);
-	C.conservativeResize(C.rows(), C.rows()+C.cols());
-	igl::cat(1, temp1, C, res);
-
-	VectorXd rhs(2*V.rows()+C.rows());
-	rhs << b,d;
-	SparseLU<SparseMatrix<double> > solver;
-	solver.analyzePattern(res);
-	solver.factorize(res);
-	cout << "solver info: " << solver.info() << endl;
-	Eigen::VectorXd x = solver.solve(rhs);
-
-	UV.resize(V.rows(),2);
-	UV.col(0) = x.segment(0,V.rows());
- 	UV.col(1) = x.segment(V.rows(),V.rows());
-  cout << "end" << endl;
- 	prevFreeBoundary = freeBoundary;
-
-}
-
-
 void computeParameterization(int type)
 {
   cout << "in parameterization" << endl;
-  if(igrad && UV.size()!=0) while(greedyflip());
+  if(igrad && UV.size()!=0) while(flipThroughEdges());
 	SparseMatrix<double> A;
 	VectorXd b;
 	Eigen::SparseMatrix<double> C;
