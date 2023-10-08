@@ -30,7 +30,7 @@
 #include <igl/cat.h>
 #include <igl/grad_intrinsic.h>
 #include <igl/edge_lengths.h>
-#include <igl/intrinsic_delaunay_triangulation.h>
+#include <igl/slim.h>
 
 #include <laplace.hpp>
 #include <datageo.hpp>
@@ -80,7 +80,7 @@ MatrixXd colors;
 MatrixXd C1, P1;
 MatrixXd C2, P2;
 vector<Eigen::Vector3d> colored_points;
-unsigned iterations=0;
+unsigned iterations=1;
 void Redraw()
 {
 	viewer.data().clear();
@@ -1110,6 +1110,55 @@ void computeParameterization(int type)
 
 }
 
+void slim_parameterization(){
+	if(UV.size()==0) {
+      cout <<  " start UV " << endl;
+			computeParameterization('2');
+      cout << " total energy: " << compute_total_energy() << endl;
+		}
+  if(igrad && UV.size()!=0) while(flip_func());
+	igl::SLIMData slimdata;
+
+  slimdata.V = V;
+  if(igrad)
+    slimdata.F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+  else
+    slimdata.F = F;
+  slimdata.V_o = UV;
+
+  slimdata.v_num = V.rows();
+  slimdata.f_num = F.rows(); 
+  slimdata.slim_energy = igl::MappingEnergyType::SYMMETRIC_DIRICHLET;
+
+  slimdata.b = fixed_UV_indices;
+  slimdata.bc = fixed_UV_positions;
+  slimdata.soft_const_p = 0;
+
+  slimdata.proximal_p = 0.0001;
+  VectorXd areas;
+	SparseMatrix<double> Dx, Dy;
+  cout << "befre grad " << endl;
+  if(igrad){
+    computeGrad_intrinsic(Dx, Dy, areas);
+  }
+  else{
+    computeSurfaceGradientMatrix(Dx,Dy);
+    igl::doublearea(V,F,areas);
+    areas/=2;
+  }
+  cout << "after grad" << endl;
+  slimdata.Dx = Dx;
+  slimdata.Dy = Dy;
+  slimdata.M = areas;
+  slimdata.mesh_area = slimdata.M.sum();
+  slimdata.mesh_improvement_3d = false; // whether to use a jacobian derived from a real mesh or an abstract regular mesh (used for mesh improvement)
+  cout << " before energy func " << endl;
+  slimdata.energy = igl::slim::compute_energy(slimdata,slimdata.V_o) / slimdata.mesh_area;
+  cout << " before solve " << endl; 
+  MatrixXd newUV = igl::slim_solve(slimdata,1);
+  UV = newUV;
+}
+
 void intrinsicUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri){
   vector<Eigen::Vector2d> points;
   vector<array<int,2> > edges;
@@ -1246,17 +1295,24 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 	case '2':
 	case '3':
 	case '4':
-	case '5':
 		reset=true;
 		if(key=='4'){
 			unsigned its = iterations;
 			while(its--) 
         computeParameterization(key);
 		}
-    computeParameterization(key);
+    else
+      computeParameterization(key);
 			// Add your code for detecting and displaying flipped triangles in the
 			// UV domain here
 		break;
+	case '5':
+    {
+    unsigned its = iterations;
+		while(its--) 
+      slim_parameterization();
+    break;
+    }
 	
 	case '6': // conformal
 		{
