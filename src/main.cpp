@@ -36,7 +36,8 @@
 #include <datageo.hpp>
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include <fstream>
-
+#include <random>
+#include <algorithm>
 using namespace std;
 using namespace Eigen;
 
@@ -58,6 +59,7 @@ Eigen::MatrixXd UV;
 DataGeo data_mesh;
 
 int option_en;
+int option_flip;
 
 bool showingUV = false;
 bool freeBoundary = false;
@@ -107,7 +109,7 @@ bool callback_mouse_move(Viewer &viewer, int mouse_x, int mouse_y)
 {
 	if (showingUV)
 		viewer.mouse_mode = igl::opengl::glfw::Viewer::MouseMode::Translation;
-	return false;
+  return false;
 }
 
 double sq(double val) {return val*val;}
@@ -117,6 +119,7 @@ static void computeSurfaceGradientMatrix(SparseMatrix<double> & D1, SparseMatrix
 	MatrixXd F1, F2, F3;
 	SparseMatrix<double> DD, Dx, Dy, Dz;
 
+  cout << " Edges: " << data_mesh.intTri->intrinsicMesh->nEdges() << endl;
 	igl::local_basis(V, F, F1, F2, F3);
 	igl::grad(V, F, DD);
 
@@ -273,85 +276,8 @@ void ConvertConstraintsToMatrixForm(VectorXi indices, MatrixXd positions, Eigen:
 
 }
 
-void testt(){
-  //data_mesh.intTri->flipToDelaunay(); 
-  data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->requireEdgeCotanWeights();
-  data_mesh.inputGeometry->requireVertexIndices();
-  vector<gcs::Edge> v;
-  double sum_nondeluanay = 0;
-  double sum_deluanay = 0;
-  for(gcs::Edge curr: data_mesh.intTri->intrinsicMesh->edges()) {
-    if(data_mesh.intTri->isDelaunay(curr)){
-      continue;
-    }
-    cout << "found non delaunay edge" << endl;
-    v.push_back(curr);
-  }
-  for (gcs::Edge e : v) {
-    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
-    double fi_len1 = data_mesh.intTri->edgeLengths[e];
-    double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
-    double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
-
-    double se_len1 = data_mesh.intTri->edgeLengths[e];
-    double se_len2 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
-    double se_len3 = data_mesh.intTri->edgeLengths[halfedges[3].edge()];
-
-
-    Matrix2d J1, J2;
-    double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
-    J1 << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
-    temp = (se_len2*se_len2 - se_len1*se_len1 - se_len3*se_len3)/(-2*se_len1); 
-    J2 << se_len1, temp, 0 , sqrt(se_len3*se_len3 - temp*temp);
-
-    Matrix2d U1, U2, V1, V2, S1, S2;
-    SSVD2x2(J1, U1, S1, V1); 
-    SSVD2x2(J2, U2, S2, V2);
-
-    sum_nondeluanay+=  S1(0,0)-S1(1,1) + S2(0,0)-S2(1,1); 
-    cout << S1(0,0) << "   " << S1(1,1) << endl;
-    cout << S2(0,0) << "   " << S2(1,1) << endl;
-    cout << "-------------------" << endl;
-
- //   if(isDelaunay(e)) continue;
-    data_mesh.intTri->flipEdgeIfPossible(e);
-
-    halfedges = e.diamondBoundary();
-    fi_len1 = data_mesh.intTri->edgeLengths[e];
-    fi_len2 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
-    fi_len3 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
-
-    se_len1 = data_mesh.intTri->edgeLengths[e];
-    se_len2 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
-    se_len3 = data_mesh.intTri->edgeLengths[halfedges[3].edge()];
-
-
-    Matrix2d J1_prime, J2_prime;
-    temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
-    J1_prime << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
-      temp = (se_len2*se_len2 - se_len1*se_len1 - se_len3*se_len3)/(-2*se_len1); 
-    J2_prime << se_len1, temp, 0 , sqrt(se_len3*se_len3 - temp*temp);
-
-    Matrix2d S1_prime, S2_prime;
-    SSVD2x2(J1_prime, U1, S1_prime, V1); 
-    SSVD2x2(J2_prime, U2, S2_prime, V2);
-    sum_deluanay+=  S1_prime(0,0) - S1_prime(1,1) + S2_prime(0,0) - S2_prime(1,1); 
-    cout  << S1_prime(0,0) << "   " <<  S1_prime(1,1) << endl;
-    cout  << S2_prime(0,0) << "   " << S2_prime(1,1) << endl;
-   // assert(sq(S1_prime(0,0)-1)+sq(S1_prime(1,1)-1) + sq(S2_prime(0,0)-1)+sq(S2_prime(1,1)-1) <= sq(S1(0,0)-1)+sq(S1(1,1)-1) + sq(S2(0,0)-1)+sq(S2(1,1)-1));
-    cout << "****** new edge ********" << endl;
-    cout << "****** new edge ********" << endl;
-
-  }
-  cout << sqrt(sum_nondeluanay) << endl;
-  cout << sqrt(sum_deluanay) << endl;
-  
- 
-
-}
-
 double (*energy)(Matrix2d &J);
+unsigned (*flip_func)(void);
 
 double drichlet(Matrix2d &J){
   return J.norm()*J.norm();
@@ -420,11 +346,11 @@ bool isConcave(vector<Vector2d>& points){
   double cross3 = cross2d(e3,e4);
   double cross4 = cross2d(e4,e1);
 
-  if (cross1 * cross2 > 0 || cross2 * cross3 > 0 || cross3 * cross4 > 0) {
-    return false;
+  if (cross1 * cross2 < 0 || cross2 * cross3 < 0 || cross3 * cross4 < 0) {
+    return true;
   }
     
-    return true;
+  return false;
 }
 
 
@@ -499,26 +425,6 @@ void faceJacobian(gcs::Face &f, Matrix2d &J){
   J = E * E_tilde.inverse();
   
 }
-
-void triangleJacobian(std::vector<gcs::SurfacePoint> &vec, Matrix2d &J){
-  double len1 = (V.transpose()*(b(vec[1])-b(vec[0]))).norm();
-  double len2 = (V.transpose()*(b(vec[2])-b(vec[0]))).norm();
-  double len3 = (V.transpose()*(b(vec[2])-b(vec[1]))).norm();
-  Matrix2d E, E_tilde;
-  double temp = (len2*len2 - len1*len1 - len3*len3)/(-2*len1); 
-  E_tilde << len1, temp, 0 , sqrt(len3*len3 - temp*temp);
-  Vector2d seg1 = UV.transpose() * (b(vec[1])-b(vec[0]));
-  Vector2d seg2 = UV.transpose() * (b(vec[2])-b(vec[0]));
-  E << seg1, seg2;
-  J = E * E_tilde.inverse();
-
-  
-}
-
-Vector2d c(vector<gcs::SurfacePoint> &vec, double t){
-  return UV.transpose()*b(vec[0])*(1-t) + UV.transpose()*b(vec.back())*t;
-}
-
 
 double triangle(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, double len1, double len2, double len3, bool complete, MatrixXd &J, VectorXd &areas){
  // cout << "lengts: " << len1 << "  " << len2 << "  " << len3 << endl;
@@ -604,84 +510,6 @@ double triangle(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2
   return len1 - seg_len1;
 }
 
-double triangle_c(vector<gcs::SurfacePoint>& vec1, vector<gcs::SurfacePoint>& vec2, double len1, double len2, double len3, bool complete, MatrixXd &J, VectorXd &areas){
-  vector<double> tvalues1 = data_mesh.intTri->recoverTraceTValues(vec1);
-  vector<double> tvalues2 = data_mesh.intTri->recoverTraceTValues(vec2);
-  Matrix2d E, E_tilde;
-  double temp = (len3*len3 - len1*len1 - len2*len2)/(-2*len1); 
-  E_tilde << len1, temp, 0 , sqrt(len2*len2 - temp*temp);
-  if(len2*len2 < temp* temp) cout <<  " ABOOOOOO " << endl;
-  int face_size = 1 + (vec2.size()-2)*2;
-  if(complete){
-    face_size += vec1.size() - vec2.size(); 
-  }
-  J.resize(face_size*2,2); 
-  areas.resize(face_size);
-  P1.resize(face_size,2);
-  P2.resize(face_size,2);
-
-  int i=0;
-  int j=0;
-
-  Vector2d edgevec1;
-  Vector2d edgevec2;
-  Matrix2d EE_tilde, EE;
-  Vector2d edgevec_before1 = tvalues1[i+1] * E_tilde.col(0);
-  Vector2d edgevec_before2 = tvalues2[j+1] * E_tilde.col(1);
-  // add first triangle 
-  EE_tilde << edgevec_before1, edgevec_before2;
-  EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j+1]) - c(vec1,tvalues1[i]);
-  J.block(0,0,2,2) << EE * EE_tilde.inverse();
-  areas(0) = abs(EE_tilde.determinant())/2;
-  P1.row(0) = b(vec1[i+1]).transpose() * UV; 
-  P2.row(0) = b(vec2[j+1]).transpose() * UV; 
-  int idx = 1;
-  ++i;
-  ++j;
-  while(j<vec2.size()-1){
-    edgevec1 = tvalues1[i+1] * E_tilde.col(0);
-    edgevec2 = tvalues2[j+1] * E_tilde.col(1);
-    EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
-    EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j]) - c(vec1,tvalues1[i]);
-
-    J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
-    areas(idx) = abs(EE_tilde.determinant())/2;
-    EE_tilde << (edgevec_before2-edgevec2), (edgevec1-edgevec2);
-    EE << c(vec2, tvalues2[j]) - c(vec2,tvalues2[j+1]), c(vec1,tvalues1[i+1]) - c(vec2,tvalues2[j+1]);
-
-    J.block(idx*2+2,0,2,2) << EE * EE_tilde.inverse();
-    areas(idx+1) = abs(EE_tilde.determinant())/2;
-
-    P1.row(idx) = b(vec1[i]).transpose()*UV;
-    P2.row(idx) = b(vec2[j+1]).transpose()*UV;
-    P1.row(idx+1) = b(vec1[i+1]).transpose()*UV;
-    P2.row(idx+1) = b(vec2[j+1]).transpose()*UV;
-
-    ++i;
-    ++j;
-    idx+=2;
-    edgevec_before1 = edgevec1;
-    edgevec_before2 = edgevec2;
-  }
-  if(complete){
-    while(i<vec1.size()-1){
-      edgevec1 = tvalues1[i+1] * E_tilde.col(0);
-      EE_tilde << (edgevec1-edgevec_before1), (edgevec_before2-edgevec_before1);
-      EE << c(vec1, tvalues1[i+1]) - c(vec1,tvalues1[i]), c(vec2,tvalues2[j]) - c(vec1,tvalues1[i]);
-      J.block(idx*2,0,2,2) << EE * EE_tilde.inverse();
-      areas(idx) = abs(EE_tilde.determinant())/2;
-      P1.row(idx) = UV.transpose()*b(vec1[i+1]);
-      P2.row(idx) = UV.transpose()*b(vec2[j]);
-
-      ++i;
-      ++idx;
-      edgevec_before1=edgevec1;
-    }
-  }
-  return len1 * (1-tvalues1[i]);
-}
-
-
 
 bool compareVectors(const pair<vector<gcs::SurfacePoint>, double >& a, const pair<vector<gcs::SurfacePoint>, double >& b) {
     return a.first.size() < b.first.size();
@@ -764,132 +592,6 @@ double calc_energy(gcs::Halfedge he){
 }
 
 
-// intrinsic edges are straight in the UV mapping
-double calc_energy_intri(gcs::Halfedge &he){
-  gcs::Halfedge he1 = he;
-  gcs::Halfedge he2 = he1.next();
-  gcs::Halfedge he3 = he2.next();
-  vector<pair<vector<gcs::SurfacePoint>, double > > vec(3);
-  vec[0].first = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(he1);
-  vec[1].first = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(he2);
-  vec[2].first = data_mesh.intTri->traceInputHalfedgeAlongIntrinsic(he3);
-  vec[0].second = data_mesh.inputGeometry->edgeLength(he1.edge());
-  vec[1].second = data_mesh.inputGeometry->edgeLength(he2.edge());
-  vec[2].second = data_mesh.inputGeometry->edgeLength(he3.edge());
-  sort(vec.begin(), vec.end(), compareVectors);
-  //cout << " intrinsic sizes " << endl;
-  //cout << vec[0].first.size() << "  " << vec[1].first.size() << "  " << vec[2].first.size() << endl;
-  int i = 0;
-  int j = 0 ;
-  if(vec[2].first[0] == vec[1].first.back()){
-    reverse(vec[1].first.begin(),vec[1].first.end());
-  }
-  else{
-    reverse(vec[2].first.begin(),vec[2].first.end());
-  }
-  MatrixXd J;
-  VectorXd areas;
-  MatrixXd temp1, temp2, temp3, temp4;
-  // cout << "start vertices: " <<vec[1].first[0] << "  " << vec[2].first[0] << endl; 
-  double new_seglen = triangle_c(vec[2].first, vec[1].first, vec[2].second, vec[1].second, vec[0].second, false, J, areas);
-  double total_energy = 0;
-  for(int i = 0; i<areas.size(); ++i){
-    Matrix2d temp = J.block(i*2,0,2,2);
-    total_energy += areas(i) * energy(temp);
-  }
-  temp1=P1;
-  temp2=P2;
-  //cout << " first done " << endl;
-  // cout << total_energy << endl;
-  if(vec[2].first.back() == vec[0].first.back()){
-    reverse(vec[0].first.begin(), vec[0].first.end());
-  }
-  double len3 = (V.transpose()*(b(vec[1].first.back())-b(vec[2].first[vec[1].first.size()-1]))).norm();
-  reverse(vec[2].first.begin(), vec[2].first.end());
-  if(vec[2].first.size()!=vec[1].first.size()){
-   // cout << " second in " << endl;
-    vector<gcs::SurfacePoint> new_seg(vec[2].first.begin(),vec[2].first.begin()+vec[2].first.size()-vec[1].first.size()+1);
-    //cout << new_seg.size() << "   " << vec[0].first.size() << endl;
-    // cout << "start vertices 2: " <<vec[0].first[0] << "  " << new_seg[0] << endl; 
-    // cout << new_seglen << "  " << vec[0].second << "  " << len3 << endl;
-  
-    if(new_seg.size()>vec[0].first.size()){
-      triangle_c(new_seg, vec[0].first, new_seglen, vec[0].second, len3, true, J, areas);
-    }
-    else{
-      triangle_c(vec[0].first, new_seg, vec[0].second, new_seglen, len3, true, J, areas);
-    }
-    temp3 = P1;
-    temp4 = P2;
-    P1.resize(temp1.rows()+temp3.rows(),2);
-    P2.resize(temp2.rows()+temp4.rows(),2);
-    P1 << temp1, temp3;
-    P2 << temp2, temp4;
-   // cout << " second done " << endl;
-    for(int i = 0; i<areas.size(); ++i){
-      Matrix2d temp = J.block(i*2,0,2,2);
-      total_energy += areas(i) * energy(temp);
-    }
-  //  cout << total_energy << endl;
-  }
-  return total_energy;
-}
-
-
-/*
-void diamondJacobians_uv(gcs::Edge &e, Matrix2d &J1, Matrix2d &J2){
-  double len1, len2, len3;
- MatrixXi F_new = data_mesh.inputMesh->getFaceVertexMatrix<int>();
-  for(gcs::Face face : e.adjacentFaces()){
-    size_t idx = data_mesh.intTri->faceIndices[face];
-    size_t v0 = F_new(idx,0); 
-    size_t v1 = F_new(idx,1); 
-    size_t v2 = F_new(idx,2); 
-    for(gcs::Edge e : face.adjacentEdges()){
-      array<gcs::Vertex, 2> verts = e.adjacentVertices();
-      if(data_mesh.intTri->vertexIndices[verts[0]]==v0){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v1){ // v0 - v1
-          len3 = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v0 - v2
-          len2 = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-      else if(data_mesh.intTri->vertexIndices[verts[0]]==v1){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v1 - v0
-          len3 = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v1 - v2
-          len1 = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-      else{
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v2 - v0
-          len2 = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v2 - v1
-          len1 = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-    }
-  Matrix2d E, E_tilde;
-  double temp = (len2*len2 - len1*len1 - len3*len3)/(-2*len1); 
-  E_tilde << len1, temp, 0 , sqrt(len3*len3 - temp*temp); 
-  
-
-  size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
-  size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
-  size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
-  
-  E1 << UV(v2,0) - UV(v1,0), UV(v3,0) - UV(v1,0),
-        UV(v2,1) - UV(v2,1), UV(v3,1) - UV(v1,1);
-  J1 = E1 * E1_tilde.inverse();
-  
-    areas(idx) = data_mesh.intTri->faceAreas[face];
-  }
-  
-}
-*/
 
 double flippeddiff(gcs::Edge e){
   if(e.isBoundary()) return 0;
@@ -931,8 +633,7 @@ double compute_total_energy(){
     total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
   }
   cout << " number flipped triangles: " << flipped_triangles << endl;
-  cout << " total triangles: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
- return total_energy;
+  return total_energy;
 }
 
 
@@ -969,13 +670,105 @@ unsigned greedyflip(){
   cout << " totalflips: " << totalflips << endl;
   return totalflips;
 }
+unsigned heuristicflip(){
+  unsigned totalflips=0;
+  gcs::EdgeData<double> diffs(* (data_mesh.intTri->intrinsicMesh));
+  vector<size_t> indices(diffs.size());
+  vector<int> visited(diffs.size());
+  int i=0;
+  for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
+    double energydiff = flippeddiff(e);
+    diffs[e] = energydiff;
+    indices[i]= e.getIndex();
+    ++i;
+  }
+  gcs::EdgeData<double> heuristic(* (data_mesh.intTri->intrinsicMesh));
+  
+  for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
+    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+    heuristic[e] = diffs[e] - (diffs[halfedges[0].edge()]+diffs[halfedges[1].edge()]+diffs[halfedges[2].edge()]+diffs[halfedges[3].edge()]);
+  }  
+  sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
+    return heuristic[i] < heuristic[j];
+    });
+  for (size_t i = 0; i < diffs.size(); i++) {
+    size_t idx = indices[i];
+    if(diffs[idx]>=0) continue;
+    if(visited[idx]) continue;
+    gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    visited[idx]=1;
+    visited[halfedges[0].edge().getIndex()]=1;
+    visited[halfedges[1].edge().getIndex()]=1;
+    visited[halfedges[2].edge().getIndex()]=1;
+    visited[halfedges[3].edge().getIndex()]=1;
+    ++totalflips;
+  }
+  cout << " totalflips: " << totalflips << endl;
+  return totalflips;
+}
+unsigned randomflip(){
+  assert(UV.size()!=0 && "Computer parameterization first!!");
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireFaceAreas();
+  unsigned totalflips = 0;
+  unsigned total_concaves =0;
 
+  vector<size_t> indices(data_mesh.intTri->intrinsicMesh->nEdges());
+  iota(indices.begin(), indices.end(), 0);
+  shuffle(indices.begin(), indices.end(), std::mt19937 {std::random_device{}()});
+  for(size_t idx : indices){
+    gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+    if(e.isBoundary()) continue;
+    gcs::Face f1 = e.halfedge().face(); 
+    gcs::Face f2 = e.halfedge().twin().face();
+    Matrix2d J1, J2, J1_prime, J2_prime;
+    diamondJacobians(e, J1, J2);
+    double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
+                    energy(J2) * data_mesh.intTri->faceArea(f2);
+    //cout << " before flip " << data_mesh.intTri->edgeLengths[e] << endl;
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    //cout << " after flip " << endl;
+    //cout << " after flip " << data_mesh.intTri->edgeLengths[e] << endl;
+    gcs::Edge flipped = e;
+    //cout << " after finding the flipped edge" << endl;
+    if(!diamondJacobians(flipped, J1_prime, J2_prime)){
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+      ++total_concaves;
+      continue;
+    }
+    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+    //cout << " energies: " << before << " -> " << after << endl;
+    double tolerance = 1e-6; // set tolerance to 1e-6 
+
+    if (fabs(before - after) / max(fabs(before), fabs(after)) > tolerance) {
+      if (before > after) {
+        totalflips++;
+        // cout << "flipped diff:  " << before - after << endl;
+      }
+      else {
+        data_mesh.intTri->flipEdgeIfPossible(flipped);
+      }
+    }
+    else {
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+    }
+  }
+  data_mesh.intTri->refreshQuantities();
+  double en = compute_total_energy();
+  cout << " energy after flippings: " << en << endl;
+  cout << " totalflips: " << totalflips << endl;
+  cout << " concaves: " << total_concaves << endl;
+  return totalflips;
+}
 
 unsigned flipThroughEdges(){
   assert(UV.size()!=0 && "Computer parameterization first!!");
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
+  unsigned total_concaves =0;
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(e.isBoundary()) continue;
     gcs::Face f1 = e.halfedge().face(); 
@@ -992,9 +785,9 @@ unsigned flipThroughEdges(){
     //cout << " after finding the flipped edge" << endl;
     if(!diamondJacobians(flipped, J1_prime, J2_prime)){
       data_mesh.intTri->flipEdgeIfPossible(flipped);
+      ++total_concaves;
       continue;
     }
-    // if one of the determinants is negative, then the axis of the triangle got different direction
     double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
     //cout << " energies: " << before << " -> " << after << endl;
     double tolerance = 1e-6; // set tolerance to 1e-6 
@@ -1017,8 +810,10 @@ unsigned flipThroughEdges(){
   double en = compute_total_energy();
   cout << " energy after flippings: " << en << endl;
   cout << " totalflips: " << totalflips << endl;
+  cout << " concaves: " << total_concaves << endl;
   return totalflips;
 }
+
 unsigned flipThroughEdges_new(){
   assert(UV.size()!=0 && "Computer parameterization first!!");
   data_mesh.intTri->requireEdgeLengths();
@@ -1077,7 +872,7 @@ unsigned flipThroughEdges_new(){
 void computeParameterization(int type)
 {
   cout << "in parameterization" << endl;
-  if(igrad && UV.size()!=0) while(flipThroughEdges());
+  if(igrad && UV.size()!=0) while(flip_func());
 	SparseMatrix<double> A;
 	VectorXd b;
 	Eigen::SparseMatrix<double> C;
@@ -1440,6 +1235,11 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   if(option_en==1) energy=symmetricDrichlet;
   if(option_en==2) energy=asap;
   if(option_en==3) energy=arap;
+  
+  if(option_flip==0) flip_func=flipThroughEdges;
+  if(option_flip==1) flip_func=greedyflip;
+  if(option_flip==2) flip_func=randomflip;
+  if(option_flip==3) flip_func=heuristicflip;
 
 	switch (key) {
   case '1':
@@ -1564,17 +1364,15 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
         faceJacobian(f, J);
-        if(J.determinant()<0) continue;
         total_energy_b += energy(J)*data_mesh.intTri->faceAreas[f];
       }
-      flipThroughEdges();
+      flip_func();
       //data_mesh.intTri->flipToDelaunay();
       data_mesh.intTri->refreshQuantities();
       double total_energy = 0;
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
         faceJacobian(f, J);
-        if(J.determinant()<0) continue;
         total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
       }
       cout << "before: " << total_energy_b << endl;
@@ -1584,7 +1382,6 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   case 'g':
     {
-      cout << " g " << endl; 
       if(UV.size()==0)
         computeParameterization('2');
       cout << " starting flipping " << endl;
@@ -1592,21 +1389,18 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
         faceJacobian(f, J);
-        if(J.determinant()<0) continue;
         total_energy_b += energy(J)*data_mesh.intTri->faceAreas[f];
       }
-      greedyflip();
+      data_mesh.intTri->flipToDelaunay();
       data_mesh.intTri->refreshQuantities();
       double total_energy = 0;
       for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
         Matrix2d J;
         faceJacobian(f, J);
-        if(J.determinant()<0) continue;
         total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
       }
       cout << "before: " << total_energy_b << endl;
       cout << "after: " << total_energy << endl;
-      
     }
     break;
 
@@ -1738,6 +1532,7 @@ bool load_mesh(string filename)
   data_mesh.intTri->requireVertexIndices();
   data_mesh.intTri->requireFaceAreas();
   cout << " Edges: " << data_mesh.intTri->intrinsicMesh->nEdges() << endl;
+  cout << " Faces: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
  
 //  testt();
   
@@ -1899,7 +1694,11 @@ int main(int argc,char *argv[]) {
       ImGui::RadioButton("symmetric drichlet", &option_en, 1); 
       ImGui::RadioButton("asap", &option_en, 2); 
       ImGui::RadioButton("arap", &option_en, 3);
-			// TODO: Add more parameters to tweak here...
+      ImGui::RadioButton("edge order", &option_flip, 0); 
+      ImGui::RadioButton("greedy", &option_flip, 1); 
+      ImGui::RadioButton("random", &option_flip, 2); 
+      ImGui::RadioButton("heuristic", &option_flip, 3);
+
 		}
 	};
 
