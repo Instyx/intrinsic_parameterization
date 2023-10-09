@@ -43,34 +43,6 @@ void SSVD2x2(const Eigen::Matrix2d& J, Eigen::Matrix2d& U, Eigen::Matrix2d& S, E
 	V(3) = c;
 }
 
-
-
-double dirichlet(Eigen::Matrix2d J){
-  return J.norm()*J.norm();
-}
-
-double symmetricDirichlet(Eigen::Matrix2d J){
-  if(J.determinant()>=0){
-    return J.norm() * J.norm() + J.inverse().norm()*J.inverse().norm();
-  }
-  else{
-    return 1e7; // should be inf
-  }
-}
-
-double arap(Eigen::Matrix2d J){
-  Eigen::Matrix2d U, S, VV;
-  SSVD2x2(J, U, S, VV);
-  Eigen::Matrix2d R = U*VV.transpose();
-  return (J-R).norm() * (J-R).norm();
-   
-}
-
-double asap(Eigen::Matrix2d J){
-  return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)+J(0,1)) * (J(1,0)+J(0,1)); 
-
-}
-
 Eigen::SparseMatrix<double> compute_L_uniform(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F){
     Eigen::SparseMatrix<double> Laplacian(V.rows(),V.rows());
     std::vector<Eigen::Triplet<double> > tripletList;
@@ -172,7 +144,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetricDirichlet;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
 
   if(igrad && UV.size()!=0) while(flip_func(data_mesh, UV, energy));
   
