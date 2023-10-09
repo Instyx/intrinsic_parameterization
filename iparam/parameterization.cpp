@@ -10,38 +10,8 @@
 #include <math.h>
 #include <Eigen/SparseLU>
 #include <intrinsicgrad.hpp>
-
-void SSVD2x2(const Eigen::Matrix2d& J, Eigen::Matrix2d& U, Eigen::Matrix2d& S, Eigen::Matrix2d& V) {
-	double e = (J(0) + J(3))*0.5;
-	double f = (J(0) - J(3))*0.5;
-	double g = (J(1) + J(2))*0.5;
-	double h = (J(1) - J(2))*0.5;
-	double q = sqrt((e*e) + (h*h));
-	double r = sqrt((f*f) + (g*g));
-	double a1 = atan2(g, f);
-	double a2 = atan2(h, e);
-	double rho = (a2 - a1)*0.5;
-	double phi = (a2 + a1)*0.5;
-
-	S(0) = q + r;
-	S(1) = 0;
-	S(2) = 0;
-	S(3) = q - r;
-
-	double c = cos(phi);
-	double s = sin(phi);
-	U(0) = c;
-	U(1) = s;
-	U(2) = -s;
-	U(3) = c;
-
-	c = cos(rho);
-	s = sin(rho);
-	V(0) = c;
-	V(1) = -s;
-	V(2) = s;
-	V(3) = c;
-}
+#include <distortion_energy.hpp>
+#include <svd.hpp>
 
 Eigen::SparseMatrix<double> compute_L_uniform(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F){
     Eigen::SparseMatrix<double> Laplacian(V.rows(),V.rows());
@@ -315,5 +285,56 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 	new_UV.col(0) = x.segment(0,V.rows());
  	new_UV.col(1) = x.segment(V.rows(),V.rows());
 
+}
+
+void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face &f, Eigen::Matrix2d &J){
+  int i = 0;
+  std::array<gcs::Halfedge, 3> halfedges;
+
+  for(gcs::Halfedge he : f.adjacentHalfedges()){
+    if(i==3) break; // assumed triangle faces
+    halfedges[i]=he;
+    ++i;
+  } 
+  double fi_len1 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
+  double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
+  double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
+
+  Eigen::Matrix2d E, E_tilde;
+  double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
+  E_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
+  
+
+  size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
+  size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
+  size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
+  E << UV(v3,0) - UV(v2,0), UV(v1,0) - UV(v2,0),
+        UV(v3,1) - UV(v2,1), UV(v1,1) - UV(v2,1);
+  J = E * E_tilde.inverse();
+  
+}
+
+double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  double (*energy)(Eigen::Matrix2d);
+
+  if(et == EnergyType::DIRICHLET) energy = dirichlet;
+  if(et == EnergyType::ASAP) energy = asap;
+  if(et == EnergyType::ARAP) energy = arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
+  data_mesh.intTri->requireFaceAreas();
+  data_mesh.intTri->requireEdgeLengths();
+  double total_energy = 0;
+  unsigned flipped_triangles = 0;
+  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+    Eigen::Matrix2d J;
+    faceJacobian(data_mesh, UV, f, J);
+    if(J.determinant()<0){
+      flipped_triangles++;
+    }
+    total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+  }
+  return total_energy;
 }
 
