@@ -17,9 +17,4 @@ struct DataGeo{
   std::unique_ptr<gcs::ManifoldSurfaceMesh> inputMesh;
   std::unique_ptr<gcs::VertexPositionGeometry> inputGeometry;
 
-
-  // per vertex data
-  Eigen::MatrixXd RAll; // ARAP rotations
-  
-
 };

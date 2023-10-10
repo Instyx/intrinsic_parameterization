@@ -85,21 +85,6 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
 
 }
 
-void computeSurfaceGradientMatrix(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::SparseMatrix<double> & D1, Eigen::SparseMatrix<double> & D2) {
-  Eigen::MatrixXd F1, F2, F3;
-  Eigen::SparseMatrix<double> DD, Dx, Dy, Dz;
-
-	igl::local_basis(V, F, F1, F2, F3);
-	igl::grad(V, F, DD);
-
-	Dx = DD.topLeftCorner(F.rows(), V.rows());
-	Dy = DD.block(F.rows(), 0, F.rows(), V.rows());
-	Dz = DD.bottomRightCorner(F.rows(), V.rows());
-
-	D1 = F1.col(0).asDiagonal()*Dx + F1.col(1).asDiagonal()*Dy + F1.col(2).asDiagonal()*Dz;
-	D2 = F2.col(0).asDiagonal()*Dx + F2.col(1).asDiagonal()*Dy + F2.col(2).asDiagonal()*Dz;
-}
-
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
     bool isFreeBoundary, bool igrad, const FlipType &ft, const EnergyType &et, int type) {
 
