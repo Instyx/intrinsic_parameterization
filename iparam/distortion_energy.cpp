@@ -1,17 +1,20 @@
 #include "distortion_energy.hpp"
 #include <math.h>
 #include <svd.hpp>
-
+#include <iostream>
 double dirichlet(Eigen::Matrix2d J){
   return J.norm()*J.norm();
 }
 
 double symmetric_dirichlet(Eigen::Matrix2d J){
   if(J.determinant()>=0){
-    return J.norm() * J.norm() + J.inverse().norm()*J.inverse().norm();
+    Eigen::Matrix2d U, S, VV;
+    SSVD2x2(J, U, S, VV);
+    return S(0,0)*S(0,0) + 1/(S(0,0)*S(0,0)) + S(1,1)*S(1,1)+1/(S(1,1)*S(1,1));
   }
   else{
-    return 1e7; // should be inf
+    std::cout << " negative dirichlet infinity " << std::endl;
+    return 1e8; // should be inf
   }
 }
 

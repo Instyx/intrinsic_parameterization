@@ -1,4 +1,5 @@
 #include "intrinsicflip.hpp"
+#include "distortion_energy.hpp"
 #include <random>
 #include <algorithm>
 #include <math.h>
@@ -44,6 +45,14 @@ bool diamondJacobians(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &
  
   data_mesh.inputGeometry->requireVertexPositions();
 
+  //        v3 /\
+  //          /  \
+  //         /    \
+  //     v1 / _ e _\ v2
+  //        \     /
+  //         \   /  
+  //          \ /
+  //          v4
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
@@ -69,30 +78,43 @@ bool diamondJacobians(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &
   return true;
 }
 
-double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, double (*energy)(Eigen::Matrix2d)){
+double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, const EnergyType &et){
   if(e.isBoundary()) return 0;
+
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  
   gcs::Face f1 = e.halfedge().face(); 
   gcs::Face f2 = e.halfedge().twin().face();
   Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
 
-  diamondJacobians(data_mesh, UV, e, J1, J2);
+  // if flip is not possible return 0
+  if(!diamondJacobians(data_mesh, UV, e, J1, J2)){
+    return 0;
+  }
   double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                   energy(J2) * data_mesh.intTri->faceArea(f2);
   data_mesh.intTri->flipEdgeIfPossible(e);
   gcs::Edge flipped = e;
 
-  // if flip is not possible flip it back and return 0
-  if(!diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime)){
-    data_mesh.intTri->flipEdgeIfPossible(flipped);
-    return 0;
-  }
+  diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
 
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
   data_mesh.intTri->flipEdgeIfPossible(flipped);
   return after-before;
 }
 
-unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*energy)(Eigen::Matrix2d)){
+unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
 
@@ -102,21 +124,18 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*ene
   std::vector<int> visited(diffs.size());
   int i=0;
   for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
-    double energydiff = flippeddiff(data_mesh, UV, e, energy);
+    double energydiff = flippeddiff(data_mesh, UV, e, et);
     diffs[e] = energydiff;
     indices[i]= e.getIndex();
     ++i;
   }
 
-  std::sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
-    return diffs[i] < diffs[j];
-    });
 
-  for (size_t i = 0; i < diffs.size(); i++) {
+  for (size_t i = 0; i < indices.size(); i++) {
     size_t idx = indices[i];
-    if(diffs[idx]>=0) break;
-    if(visited[idx]) continue;
+    if(diffs[idx]>=0 || visited[idx]) continue;
     gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+    if(e.isBoundary()) continue;
     data_mesh.intTri->flipEdgeIfPossible(e);
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     visited[idx]=1;
@@ -131,7 +150,15 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*ene
   return totalflips;
 }
 
-unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*energy)(Eigen::Matrix2d)){
+unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
+
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
 
@@ -141,7 +168,7 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*
   std::vector<int> visited(diffs.size());
   int i=0;
   for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
-    double energydiff = flippeddiff(data_mesh, UV, e, energy);
+    double energydiff = flippeddiff(data_mesh, UV, e, et);
     diffs[e] = energydiff;
     indices[i]= e.getIndex();
     ++i;
@@ -149,19 +176,19 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*
   gcs::EdgeData<double> heuristic(* (data_mesh.intTri->intrinsicMesh));
   
   for(gcs::Edge e : data_mesh.intTri->intrinsicMesh->edges()){
+    if(e.isBoundary()){
+      heuristic[e] = 0;
+      continue;
+    }
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     heuristic[e] = diffs[e] - (diffs[halfedges[0].edge()]+diffs[halfedges[1].edge()]+diffs[halfedges[2].edge()]+diffs[halfedges[3].edge()]);
   }  
 
-  std::sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
-    return heuristic[i] < heuristic[j];
-    });
-
-  for (size_t i = 0; i < diffs.size(); i++) {
+  for (size_t i = 0; i < indices.size(); i++) {
     size_t idx = indices[i];
     if(diffs[idx]>=0) continue;
-    if(visited[idx]) continue;
     gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+    if(visited[idx] || e.isBoundary()) continue;
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     data_mesh.intTri->flipEdgeIfPossible(e);
     visited[idx]=1;
@@ -176,7 +203,14 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*
   return totalflips;
 }
 
-unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*energy)(Eigen::Matrix2d)){
+unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
@@ -191,15 +225,14 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*ene
     gcs::Face f1 = e.halfedge().face(); 
     gcs::Face f2 = e.halfedge().twin().face();
     Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
-    diamondJacobians(data_mesh, UV, e, J1, J2);
+    if(!diamondJacobians(data_mesh, UV, e, J1, J2)) continue;
+
     double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                     energy(J2) * data_mesh.intTri->faceArea(f2);
     data_mesh.intTri->flipEdgeIfPossible(e);
     gcs::Edge flipped = e;
-    if(!diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime)){
-      data_mesh.intTri->flipEdgeIfPossible(flipped);
-      continue;
-    }
+    diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
+    
     double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
     double tolerance = 1e-6; // set tolerance to 1e-6 
 
@@ -219,7 +252,14 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*ene
   return totalflips;
 }
 
-unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*energy)(Eigen::Matrix2d)){
+unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
@@ -228,15 +268,13 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, double (*
     gcs::Face f1 = e.halfedge().face(); 
     gcs::Face f2 = e.halfedge().twin().face();
     Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
-    diamondJacobians(data_mesh, UV, e, J1, J2);
+    if(!diamondJacobians(data_mesh, UV, e, J1, J2)) continue;
     double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                     energy(J2) * data_mesh.intTri->faceArea(f2);
     data_mesh.intTri->flipEdgeIfPossible(e);
     gcs::Edge flipped = e;
-    if(!diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime)){
-      data_mesh.intTri->flipEdgeIfPossible(flipped);
-      continue;
-    }
+    diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
+    
     double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
     double tolerance = 1e-6; // set tolerance to 1e-6 
 

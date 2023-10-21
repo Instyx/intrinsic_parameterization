@@ -4,7 +4,6 @@
 #include <igl/boundary_loop.h>
 #include <igl/map_vertices_to_circle.h>
 #include <distortion_energy.hpp>
-
 void boundary(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBoundary, Eigen::VectorXi &fixed_UV_indices, Eigen::MatrixXd &fixed_UV_positions) {
   if (!isFreeBoundary) {
     // The boundary vertices should be fixed to positions on the unit disc. Find these position and
@@ -31,26 +30,45 @@ void boundary(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBou
   }
 
 }
-
-void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary, const FlipType &ft){
-
-  auto flip_func = edgeorder_flip;
-  if(ft == FlipType::EDGEORDER) flip_func = edgeorder_flip;
-  if(ft == FlipType::GREEDY) flip_func = greedy_flip;
-  if(ft == FlipType::RANDOM) flip_func = random_flip;
-  if(ft == FlipType::HEURISTIC) flip_func = heuristic_flip;
+double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   
+  auto energy = symmetric_dirichlet;
+  Eigen::SparseMatrix<double> Dx, Dy;
+  Eigen::VectorXd areas;
+  if(false){
+      computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
+    }
+    else{
+		  computeSurfaceGradientMatrix(data_mesh.V, data_mesh.F, Dx,Dy);
+      igl::doublearea(data_mesh.V,data_mesh.F,areas);
+		  areas/=2;
+    }
+  Eigen::VectorXd Dxu = Dx * UV.col(0);		
+  Eigen::VectorXd Dxv = Dx * UV.col(1);		
+  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+  Eigen::VectorXd Dyv = Dy * UV.col(1);
+
+  double total_energy = 0;
+  unsigned flipped_triangles = 0;
+  double total_area = 0;
+  for(int i=0; i<data_mesh.intTri->intrinsicMesh->nFaces(); ++i){
+    Eigen::Matrix2d J;
+		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+    if(J.determinant()<0){
+      flipped_triangles++;
+    }
+    double locen = energy(J)*areas(i);
+    total_area+=areas(i);
+    total_energy += locen; 
+  }
+  return total_energy/total_area;
+}
+
+void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary){
+
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
  
-  if(igrad) {
-    unsigned flips = flip_func(data_mesh, UV, symmetric_dirichlet);
-    while(flips){
-      flips = flip_func(data_mesh, UV, symmetric_dirichlet);
-    }
-  }
-
-
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
 
@@ -67,13 +85,11 @@ void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::M
   slimdata.M = areas;
   slimdata.mesh_area = slimdata.M.sum();
 
+  if(igrad) slimdata.F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>(); 
 
   if(!slimdata.has_pre_calc){
     slimdata.V = V;
-    if(igrad)
-      slimdata.F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
-    else
-      slimdata.F = F;
+    if(!igrad) slimdata.F = F;
 
     slimdata.V_o = UV;
 
@@ -107,7 +123,7 @@ void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::M
     for (int i = 0; i < slimdata.dim * slimdata.dim; i++)
       for (int j = 0; j < slimdata.f_n; j++)
         slimdata.WGL_M(i * slimdata.f_n + j) = slimdata.M(j);
-
+    slimdata.energy = compute_total_energy(data_mesh, UV);
     slimdata.first_solve = true;
     slimdata.has_pre_calc = true;
   }

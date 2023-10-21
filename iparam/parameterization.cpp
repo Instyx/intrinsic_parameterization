@@ -12,6 +12,17 @@
 #include <intrinsicgrad.hpp>
 #include <distortion_energy.hpp>
 #include <svd.hpp>
+#include <stdio.h>
+
+// TODO: global variables hmm?? 
+Eigen::SparseMatrix<double> C;
+Eigen::VectorXd d;
+  
+void reset_constraints(){
+  C.resize(0,0);
+  d.resize(0);
+}
+
 
 Eigen::SparseMatrix<double> compute_L_uniform(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F){
     Eigen::SparseMatrix<double> Laplacian(V.rows(),V.rows());
@@ -64,12 +75,15 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
   }
   else {
     // Fix two UV vertices. This should be done in an intelligent way. Hint: The two fixed vertices should be the two most distant one on the mesh.
-    
+   // TODO:: do not compute the constraints every time  
     // brute force to find most distant 2 vertices
-    unsigned fixed1 = 0, fixed2 = 0;
-    for (unsigned i = 0; i < V.rows(); ++i) {
-      for (unsigned j = 0; j < V.rows(); ++j) {
-        if((V.row(i)-V.row(j)).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
+
+    igl::boundary_loop(F, fixed_UV_indices);
+
+    unsigned fixed1 = fixed_UV_indices[0], fixed2 = fixed_UV_indices[0];
+    for (unsigned i = 0; i < fixed_UV_indices.rows(); ++i) {
+      for (unsigned j = 0; j < fixed_UV_indices.rows(); ++j) {
+        if((V.row(fixed_UV_indices[i])-V.row(fixed_UV_indices[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
           fixed1 = i;
           fixed2 = j;
         }
@@ -86,29 +100,11 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
 }
 
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
-    bool isFreeBoundary, bool igrad, const FlipType &ft, const EnergyType &et, int type) {
+    bool isFreeBoundary, bool igrad, int type) {
 
-  auto flip_func = edgeorder_flip;
-  double (*energy)(Eigen::Matrix2d);
-
-  if(ft == FlipType::EDGEORDER) flip_func = edgeorder_flip;
-  if(ft == FlipType::GREEDY) flip_func = greedy_flip;
-  if(ft == FlipType::RANDOM) flip_func = random_flip;
-  if(ft == FlipType::HEURISTIC) flip_func = heuristic_flip;
-
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
-
-  if(igrad && UV.size()!=0) while(flip_func(data_mesh, UV, energy));
-  
   Eigen::SparseMatrix<double> A;
   Eigen::VectorXd b;
-	Eigen::SparseMatrix<double> C;
-  Eigen::VectorXd d;
-  
-  computeConstraints(V, F, isFreeBoundary, C, d);
+	if(d.size()==0)  computeConstraints(V, F, isFreeBoundary, C, d);
 
 	// Find the linear system for the parameterization (1- Tutte, 2- Harmonic, 3- LSCM, 4- ARAP)
 	// and put it in the matrix A.
@@ -120,7 +116,12 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		// Hint: use the adjacency matrix of the mesh
 		// A = (L 0)
 		//     (0 L)
-    Eigen::SparseMatrix<double> L = compute_L_uniform(V, F);
+    Eigen::SparseMatrix<double> L;
+    if(igrad){
+      Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+      L = compute_L_uniform(V, F_new);
+    }
+    else; L = compute_L_uniform(V, F);
     std::vector<Eigen::Triplet<double> > tlist;
 		for (int i = 0; i < L.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
@@ -139,7 +140,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		//A = (L 0)
 		//    (0 L)  
     Eigen::SparseMatrix<double> L;
-     if(igrad){
+    if(igrad){
       data_mesh.intTri->requireCotanLaplacian();
       L=data_mesh.intTri->cotanLaplacian;
     }
@@ -171,10 +172,10 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
       areas/=2;
     }
 		
-		// A = (DxADx + DyADy    DxADy - DyADx)
-		//     (-DxADy + DyADx   DxADx + DyADy)
+		// A = (DxADx + DyADy  -DxADy + DyADx)
+		//     (DxADy - DyADx   DxADx + DyADy)
     Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-    Eigen::SparseMatrix<double> B2 = Dx.transpose()*areas.asDiagonal()*Dy - Dy.transpose()*areas.asDiagonal()*Dx; 
+    Eigen::SparseMatrix<double> B2 = -Dx.transpose()*areas.asDiagonal()*Dy + Dy.transpose()*areas.asDiagonal()*Dx; 
     std::vector<Eigen::Triplet<double> > tlist;
 		for (int i = 0; i < B1.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
@@ -199,10 +200,6 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		// Implement a function that computes the local step first
 		// Then construct the matrix with the given rotation matrices
 		
-		if(UV.size()==0) {
-			computeParameterization(data_mesh, V, F, UV, new_UV, isFreeBoundary, igrad, ft, et, '3');
-      UV = new_UV;
-		}
     Eigen::VectorXd areas;
     Eigen::SparseMatrix<double> Dx, Dy;
     if(igrad){
@@ -254,10 +251,11 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
 	// build (A C^t; C 0)
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
-	C.conservativeResize(C.rows(), C.rows()+C.cols());
-	igl::cat(1, temp1, C, res);
+	igl::cat(2, C, zeros, temp2);
+	igl::cat(1, temp1, temp2, res);
 
   Eigen::VectorXd rhs(2*V.rows()+C.rows());
 	rhs << b,d;
@@ -265,16 +263,18 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 	solver.analyzePattern(res);
 	solver.factorize(res);
 	Eigen::VectorXd x = solver.solve(rhs);
-
+  std::cout << " solver " << solver.info() << std::endl;
 	new_UV.resize(V.rows(),2);
 	new_UV.col(0) = x.segment(0,V.rows());
  	new_UV.col(1) = x.segment(V.rows(),V.rows());
 
 }
 
-void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face &f, Eigen::Matrix2d &J){
+void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Eigen::Matrix2d &J){
   int i = 0;
   std::array<gcs::Halfedge, 3> halfedges;
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
 
   for(gcs::Halfedge he : f.adjacentHalfedges()){
     if(i==3) break; // assumed triangle faces
@@ -289,12 +289,14 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face &f, E
   double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
   E_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
   
-
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
   E << UV(v3,0) - UV(v2,0), UV(v1,0) - UV(v2,0),
         UV(v3,1) - UV(v2,1), UV(v1,1) - UV(v2,1);
+  Eigen::Matrix2d E_tilde_inverse;
+  E_tilde_inverse << E_tilde(1,1), -E_tilde(0,1), -E_tilde(1,0), E_tilde(0,0);
+  E_tilde_inverse = E_tilde_inverse/E_tilde.determinant();
   J = E * E_tilde.inverse();
   
 }
@@ -307,19 +309,42 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
   if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  Eigen::SparseMatrix<double> Dx, Dy;
+  Eigen::VectorXd areas;
+  computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
 
-  data_mesh.intTri->requireFaceAreas();
-  data_mesh.intTri->requireEdgeLengths();
+  Eigen::VectorXd Dxu = Dx * UV.col(0);		
+  Eigen::VectorXd Dxv = Dx * UV.col(1);		
+  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+  Eigen::VectorXd Dyv = Dy * UV.col(1);
+/*
+  bool hasNaN = false;
+  for (int k = 0; k < Dx.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(Dx, k); it; ++it) {
+          if (std::isnan(it.value())) {
+              hasNaN = true;
+              break;
+          }
+      }
+      if (hasNaN) {
+          break;
+      }
+  }
+  if(hasNaN) std::cout << " Dx problem " << std::endl;
+  */
   double total_energy = 0;
   unsigned flipped_triangles = 0;
-  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+  for(int i=0;i<data_mesh.intTri->intrinsicMesh->nFaces();++i){
     Eigen::Matrix2d J;
-    faceJacobian(data_mesh, UV, f, J);
+		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
     if(J.determinant()<0){
       flipped_triangles++;
     }
-    total_energy += energy(J)*data_mesh.intTri->faceAreas[f];
+    double temp = energy(J)*areas(i);
+    if(std::isnan(temp))
+      std::cout << "nana bulundu " << J << std::endl;
+    total_energy += energy(J)*areas(i);
   }
-  return total_energy;
+  return total_energy/areas.sum();
 }
 
