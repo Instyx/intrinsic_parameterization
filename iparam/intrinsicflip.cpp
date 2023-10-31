@@ -103,8 +103,15 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
 
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+
+  double tolerance = 1e-6; // set tolerance to 1e-6 
   data_mesh.intTri->flipEdgeIfPossible(flipped);
-  return after-before;
+  if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
+    return after - before;
+  }
+  else {
+    return 0; 
+  }
 }
 
 unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
@@ -131,9 +138,10 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
   }
 
 
+  double tolerance = 1e-6; // set tolerance to 1e-6 
   for (size_t i = 0; i < indices.size(); i++) {
     size_t idx = indices[i];
-    if(diffs[idx]>=0 || visited[idx]) continue;
+    if(diffs[idx]>=0   || visited[idx]) continue;
     gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
     if(e.isBoundary()) continue;
     data_mesh.intTri->flipEdgeIfPossible(e);

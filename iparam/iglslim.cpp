@@ -13,20 +13,10 @@ void boundary(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBou
   }
   else {
     
-    // brute force to find most distant 2 vertices
-    unsigned fixed1 = 0, fixed2 = 0;
-    for (unsigned i = 0; i < V.rows(); ++i) {
-      for (unsigned j = 0; j < V.rows(); ++j) {
-        if((V.row(i)-V.row(j)).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
-          fixed1 = i;
-          fixed2 = j;
-        }
-      }
-    }
-    fixed_UV_indices.resize(2);
-    fixed_UV_positions.resize(2,2);
-    fixed_UV_indices << fixed1, fixed2;
-    fixed_UV_positions << 1,0,0,1;
+    fixed_UV_indices.resize(1);
+    fixed_UV_positions.resize(1,2);
+    fixed_UV_indices << 0;
+    fixed_UV_positions << 0,0;
   }
 
 }

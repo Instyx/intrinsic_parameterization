@@ -64,7 +64,7 @@ void ConvertConstraintsToMatrixForm(Eigen::VectorXi indices, Eigen::MatrixXd pos
 
 }
 
-void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBoundary, Eigen::SparseMatrix<double> &C, Eigen::VectorXd &d) {
+void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBoundary, int type, Eigen::SparseMatrix<double> &C, Eigen::VectorXd &d) {
   Eigen::VectorXi fixed_UV_indices;
   Eigen::MatrixXd fixed_UV_positions;
   if (!isFreeBoundary) {
@@ -74,29 +74,38 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
   }
   else {
-    // Fix two UV vertices. This should be done in an intelligent way. Hint: The two fixed vertices should be the two most distant one on the mesh.
-   // TODO:: do not compute the constraints every time  
     // brute force to find most distant 2 vertices
+    if(type=='3'){
+      igl::boundary_loop(F, fixed_UV_indices);
 
-    igl::boundary_loop(F, fixed_UV_indices);
-
-    unsigned fixed1 = fixed_UV_indices[0], fixed2 = fixed_UV_indices[0];
-    for (unsigned i = 0; i < fixed_UV_indices.rows(); ++i) {
-      for (unsigned j = 0; j < fixed_UV_indices.rows(); ++j) {
-        if((V.row(fixed_UV_indices[i])-V.row(fixed_UV_indices[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
-          fixed1 = i;
-          fixed2 = j;
+      unsigned fixed1 = fixed_UV_indices[0], fixed2 = fixed_UV_indices[0];
+      for (unsigned i = 0; i < fixed_UV_indices.rows(); ++i) {
+        for (unsigned j = 0; j < fixed_UV_indices.rows(); ++j) {
+          if((V.row(fixed_UV_indices[i])-V.row(fixed_UV_indices[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
+            fixed1 = fixed_UV_indices[i];
+            fixed2 = fixed_UV_indices[j];
+            //fixed1 = i;
+            //fixed2 = j;
+          }
         }
       }
+      fixed_UV_indices.resize(2);
+      fixed_UV_positions.resize(2,2);
+      fixed_UV_indices << fixed1, fixed2;
+      fixed_UV_positions << 1,0,0,1;
     }
-    fixed_UV_indices.resize(2);
-    fixed_UV_positions.resize(2,2);
-    fixed_UV_indices << fixed1, fixed2;
-    fixed_UV_positions << 1,0,0,1;
+    else if(type=='4'){
+      fixed_UV_indices.resize(1);
+      fixed_UV_positions.resize(1,2);
+      fixed_UV_indices << 0;
+      fixed_UV_positions << 0,0;
+    }
+    else {
+      std::cout << "Free boudnary not possible" << std::endl;
+    }
   }
 	
 	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions,V.rows(), C, d); 
-
 }
 
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
@@ -104,7 +113,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
   Eigen::SparseMatrix<double> A;
   Eigen::VectorXd b;
-	if(d.size()==0)  computeConstraints(V, F, isFreeBoundary, C, d);
+	if(d.size()==0)  computeConstraints(V, F, isFreeBoundary, type, C, d);
 
 	// Find the linear system for the parameterization (1- Tutte, 2- Harmonic, 3- LSCM, 4- ARAP)
 	// and put it in the matrix A.
@@ -301,7 +310,7 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   
 }
 
-double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad){
   
   double (*energy)(Eigen::Matrix2d);
 
@@ -309,9 +318,16 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
   if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
-  Eigen::SparseMatrix<double> Dx, Dy;
   Eigen::VectorXd areas;
-  computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
+    Eigen::SparseMatrix<double> Dx, Dy;
+    if(igrad){
+      computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
+    }
+    else{
+		  computeSurfaceGradientMatrix(data_mesh.V, data_mesh.F, Dx, Dy);
+      igl::doublearea(data_mesh.V, data_mesh.F, areas);
+		  areas/=2;
+    }
 
   Eigen::VectorXd Dxu = Dx * UV.col(0);		
   Eigen::VectorXd Dxv = Dx * UV.col(1);		
@@ -333,13 +349,9 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   if(hasNaN) std::cout << " Dx problem " << std::endl;
   */
   double total_energy = 0;
-  unsigned flipped_triangles = 0;
   for(int i=0;i<data_mesh.intTri->intrinsicMesh->nFaces();++i){
     Eigen::Matrix2d J;
 		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-    if(J.determinant()<0){
-      flipped_triangles++;
-    }
     double temp = energy(J)*areas(i);
     if(std::isnan(temp))
       std::cout << "nana bulundu " << J << std::endl;
