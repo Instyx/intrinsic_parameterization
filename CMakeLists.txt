@@ -11,10 +11,9 @@ option(LIBIGL_GLFW         "Build target igl::glfw"         ON)
 option(LIBIGL_IMGUI        "Build target igl::imgui"        ON)
 option(LIBIGL_OPENGL       "Build target igl::opengl"       ON)
 #option(LIBIGL_PNG          "Build target igl::png"          ON)
-#include(libigl)
+include(libigl)
 
 add_subdirectory("geometry-central")
-add_subdirectory("libigl")
 
 
 
