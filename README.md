@@ -4,6 +4,14 @@ This is the code that is used for the bachelor thesis "Exploring intrinsic trian
 
 Some parts are taken from my submission to the assigment 4 for the course Shape Modeling and Geometry Processing in 2022 Autumn Semester at ETH Zürich and from the code that is used for iARAP (ARAP Revisited: Discretizing the Elastic Energy using Intrinsic Voronoi Cells).
 
-The implementation is in the folder iparam. 
+The implementation is in the folder iparam.
+
+```
+git clone --recursive git@github.com:Instyx/intrinsic_parameterization.git
+mkdir build
+cd build 
+cmake ..
+make -j6
+```
 
 
