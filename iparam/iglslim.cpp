@@ -6,13 +6,12 @@
 #include <distortion_energy.hpp>
 void boundary(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBoundary, Eigen::VectorXi &fixed_UV_indices, Eigen::MatrixXd &fixed_UV_positions) {
   if (!isFreeBoundary) {
-    // The boundary vertices should be fixed to positions on the unit disc. Find these position and
-    // save them in the #V x 2 matrix fixed_UV_position.
+    // map boundary to the unit circle
     igl::boundary_loop(F, fixed_UV_indices);
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
   }
   else {
-    
+    // fix the first vertex 
     fixed_UV_indices.resize(1);
     fixed_UV_positions.resize(1,2);
     fixed_UV_indices << 0;
@@ -28,11 +27,11 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   if(false){
       computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
     }
-    else{
-		  computeSurfaceGradientMatrix(data_mesh.V, data_mesh.F, Dx,Dy);
-      igl::doublearea(data_mesh.V,data_mesh.F,areas);
-		  areas/=2;
-    }
+  else{
+    computeSurfaceGradientMatrix(data_mesh.V, data_mesh.F, Dx,Dy);
+    igl::doublearea(data_mesh.V,data_mesh.F,areas);
+    areas/=2;
+  }
   Eigen::VectorXd Dxu = Dx * UV.col(0);		
   Eigen::VectorXd Dxv = Dx * UV.col(1);		
   Eigen::VectorXd Dyu = Dy * UV.col(0);		
@@ -117,8 +116,6 @@ void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::M
     slimdata.first_solve = true;
     slimdata.has_pre_calc = true;
   }
-  
-  
   
   Eigen::MatrixXd newUV = igl::slim_solve(slimdata,1);
   UV = newUV;

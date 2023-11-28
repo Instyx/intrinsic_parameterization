@@ -14,7 +14,7 @@
 #include <svd.hpp>
 #include <stdio.h>
 
-// TODO: global variables hmm?? 
+// global variables for the boundary conditions 
 Eigen::SparseMatrix<double> C;
 Eigen::VectorXd d;
   
@@ -41,11 +41,6 @@ Eigen::SparseMatrix<double> compute_L_uniform(const Eigen::MatrixXd &V, const Ei
 
 
 void ConvertConstraintsToMatrixForm(Eigen::VectorXi indices, Eigen::MatrixXd positions, unsigned nvertices, Eigen::SparseMatrix<double> &C, Eigen::VectorXd &d) {
-	// Convert the list of fixed indices and their fixed positions to a linear system
-	// Hint: The matrix C should contain only one non-zero element per row and d should contain the positions in the correct order.
-	
-	// size of C : #constraints x 2#V
-	// C contains one 1 per row and it corresponds to one u or v coordinate
 	
 	// u coordinates
   std::vector<Eigen::Triplet<double> > list;
@@ -68,13 +63,12 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
   Eigen::VectorXi fixed_UV_indices;
   Eigen::MatrixXd fixed_UV_positions;
   if (!isFreeBoundary) {
-    // The boundary vertices should be fixed to positions on the unit disc. Find these position and
-    // save them in the #V x 2 matrix fixed_UV_position.
+    // the boundary is fixed to unit circle 
     igl::boundary_loop(F, fixed_UV_indices);
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
   }
   else {
-    // brute force to find most distant 2 vertices
+    // brute force to find most distant 2 vertices on the boundary
     if(type=='3'){
       igl::boundary_loop(F, fixed_UV_indices);
 
@@ -95,6 +89,7 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
       fixed_UV_positions << 1,0,0,1;
     }
     else if(type=='4'){
+      // fix the first vertex
       fixed_UV_indices.resize(1);
       fixed_UV_positions.resize(1,2);
       fixed_UV_indices << 0;
@@ -115,14 +110,10 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
   Eigen::VectorXd b;
 	if(d.size()==0)  computeConstraints(V, F, isFreeBoundary, type, C, d);
 
-	// Find the linear system for the parameterization (1- Tutte, 2- Harmonic, 3- LSCM, 4- ARAP)
-	// and put it in the matrix A.
-	// The dimensions of A should be 2#V x 2#V.
 	A.resize(2*V.rows(),2*V.rows());
 	b.resize(2*V.rows());
+  // Tutte - uniform Laplacian
 	if (type == '1') {
-		// Add your code for computing uniform Laplacian for Tutte parameterization
-		// Hint: use the adjacency matrix of the mesh
 		// A = (L 0)
 		//     (0 L)
     Eigen::SparseMatrix<double> L;
@@ -142,10 +133,8 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		b = Eigen::VectorXd::Zero(2*V.rows());
 	}
 
+  // Harmonic - cotangent Laplacian
 	if (type == '2') {
-		// Add your code for computing cotangent Laplacian for Harmonic parameterization
-		// Use can use a function "cotmatrix" from libIGL, but ~~~~***READ THE DOCUMENTATION***~~~~
-
 		//A = (L 0)
 		//    (0 L)  
     Eigen::SparseMatrix<double> L;
@@ -166,10 +155,8 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		b = Eigen::VectorXd::Zero(2*V.rows());
 
 	}
+  // LSCM
 	if (type == '3') {
-		// Add your code for computing the system for LSCM parameterization
-		// Note that the libIGL implementation is different than what taught in the tutorial! Do not rely on it!!
-		
     Eigen::SparseMatrix<double> Dx, Dy;
     Eigen::VectorXd areas;
     if(igrad){
@@ -193,7 +180,6 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 			}
 		}
   
-
 		for (int i = 0; i < B2.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(B2,i); it; ++it) {
 				tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col(), it.value()));
@@ -203,12 +189,8 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		A.setFromTriplets(tlist.begin(), tlist.end());
 		b = Eigen::VectorXd::Zero(2*V.rows());
 	}
-
+  // ARAP
 	if (type == '4') {
-		// Add your code for computing ARAP system and right-hand side
-		// Implement a function that computes the local step first
-		// Then construct the matrix with the given rotation matrices
-		
     Eigen::VectorXd areas;
     Eigen::SparseMatrix<double> Dx, Dy;
     if(igrad){
@@ -226,7 +208,8 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
     Eigen::VectorXd Dyv = Dy * UV.col(1);
     Eigen::MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix
     int flipped_triangles = 0;
-		for (int i = 0; i < F.rows(); ++i) {
+	  // local step
+    for (int i = 0; i < F.rows(); ++i) {
       Eigen::Matrix2d J, U, S, VV;
 			J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
       if(J.determinant()<0) ++flipped_triangles;
@@ -252,11 +235,6 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		A.setFromTriplets(tlist.begin(), tlist.end());
 
 	}
-
-  // Solve the linear system.
-	// Construct the system as discussed in class and the assignment sheet
-	// Use igl::cat to concatenate matrices
-	// Use Eigen::SparseLU to solve the system. Refer to tutorial 3 for more detail
 
 	// build (A C^t; C 0)
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
@@ -290,6 +268,8 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
     halfedges[i]=he;
     ++i;
   } 
+ 
+  // flattening the intrinsic triangle using edge lengths
   double fi_len1 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
   double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
   double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
@@ -297,7 +277,8 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   Eigen::Matrix2d E, E_tilde;
   double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
   E_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
-  
+ 
+  // computing the Jacobian
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
@@ -354,7 +335,7 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
 		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
     double temp = energy(J)*areas(i);
     if(std::isnan(temp))
-      std::cout << "nana bulundu " << J << std::endl;
+      std::cout << " Nan found in Jacobian: " << J << std::endl;
     total_energy += energy(J)*areas(i);
   }
   return total_energy/areas.sum();

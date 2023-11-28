@@ -2,6 +2,7 @@
 #include <math.h>
 #include <svd.hpp>
 #include <iostream>
+
 double dirichlet(Eigen::Matrix2d J){
   return J.norm()*J.norm();
 }
@@ -28,7 +29,6 @@ double arap(Eigen::Matrix2d J){
 
 double asap(Eigen::Matrix2d J){
   return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)+J(0,1)) * (J(1,0)+J(0,1)); 
-
 }
 
 

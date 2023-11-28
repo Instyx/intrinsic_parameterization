@@ -31,6 +31,7 @@ void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx,
   areas.resize(nfaces);
   Eigen::MatrixXd lengths(nfaces,3);
 
+  // ordering the lenthgs correct order for igl::grad_intrinsic
   Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
   for(gcs::Face face : data_mesh.intTri->intrinsicMesh->faces()){
     size_t idx = data_mesh.intTri->faceIndices[face];

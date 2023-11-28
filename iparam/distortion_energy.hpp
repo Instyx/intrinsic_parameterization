@@ -8,7 +8,7 @@ enum class EnergyType{
   SYMMETRIC_DIRICHLET
 };
 
-
+// distortion energies
 double dirichlet(Eigen::Matrix2d J);
 double asap(Eigen::Matrix2d J);
 double arap(Eigen::Matrix2d J);

@@ -117,7 +117,8 @@ void angle_distortion(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const 
   Eigen::VectorXd angle_dist2(F.rows());
   for (unsigned i = 0; i < F.rows(); ++i) {
     Eigen::Matrix2d J, U, S, VV;
-    J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+    //J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+    //std::cout << J << std::endl;
     SSVD2x2(J,U,S,VV);
     if(S(1,1)!=0)
       angle_dist1(i) = S(0,0) / S(1,1); 
@@ -126,12 +127,14 @@ void angle_distortion(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const 
     if(S(0,0)!=0)
       angle_dist2(i) = S(1,1) / S(0,0);
     else
-      angle_dist2(i) = 1e7; 
+      angle_dist2(i) = 1e7;
   }
-  angle_dists.resize(F.rows()*2);
-  angle_dists << angle_dist1, angle_dist2;
+  angle_dists.resize(F.rows());
+  angle_dists << angle_dist1.cwiseAbs() + angle_dist2.cwiseAbs();
+  //std::cout << angle_dists << std::endl;
 }
 
+// is bugged
 void angle_distortion_intri(DataGeo &data_mesh, const Eigen::MatrixXd &UV, Eigen::VectorXd &angle_errors, Eigen::VectorXd &angle_dists){
 
   Eigen::MatrixXi F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
@@ -199,10 +202,12 @@ void angle_distortion_intri(DataGeo &data_mesh, const Eigen::MatrixXd &UV, Eigen
     if(S(0,0)!=0)
       angle_dist2(i) = S(1,1) / S(0,0);
     else
-      angle_dist2(i) = 1e7; 
+      angle_dist2(i) = 1e7;
+   // std::cout << S(0) << "  " << S(3) << std::endl; 
   }
-  angle_dists.resize(F.rows()*2);
-  angle_dists << angle_dist1, angle_dist2;
+  angle_dists.resize(F.rows());
+  angle_dists << angle_dist1.cwiseAbs() + angle_dist2.cwiseAbs();
+ // std::cout << angle_dists << std:endl;
 }
 
 
@@ -260,13 +265,14 @@ void compute_metrics(DataGeo &data_mesh, const Eigen::MatrixXd &UV_o, std::vecto
   igl::doublearea(V,F,extrinsic_areas);
   extrinsic_areas/=2;
   igl::doublearea(UV,F,extrinsic_areasUV);
+  extrinsic_areasUV = extrinsic_areasUV.cwiseAbs();
   extrinsic_areasUV/=2;
-
+  // std::cout << extrinsic_areasUV << std::endl;
   // normalize
-  V = V / extrinsic_areas.norm();
-  UV = UV / extrinsic_areasUV.norm();
-  extrinsic_areas/=extrinsic_areas.norm(); 
-  extrinsic_areasUV/=extrinsic_areasUV.norm(); 
+  V = V / std::sqrt(extrinsic_areas.sum());
+  UV = UV / std::sqrt(extrinsic_areasUV.sum());
+  extrinsic_areas/=extrinsic_areas.sum(); 
+  extrinsic_areasUV/=extrinsic_areasUV.sum(); 
   
   // compute metrics
   double extrinsic_flipped = flipped_triangles(V,F,UV);
@@ -274,15 +280,16 @@ void compute_metrics(DataGeo &data_mesh, const Eigen::MatrixXd &UV_o, std::vecto
   Eigen::VectorXd extrinsic_angle_dists, extrinsic_angle_errors;
   angle_distortion(V, F, UV, extrinsic_angle_errors, extrinsic_angle_dists);
   double extrinsic_average_angle_error = extrinsic_areas.cwiseProduct(extrinsic_angle_errors).sum();
-  double extrinsic_max_angle_dist = extrinsic_angle_dists.maxCoeff();
+  double extrinsic_max_angle_dist = extrinsic_angle_dists.maxCoeff()-2;
 
-  Eigen::VectorXd extrinsic_area_dists = extrinsic_areasUV.cwiseQuotient(extrinsic_areas);
+  Eigen::VectorXd extrinsic_area_dists = extrinsic_areasUV.cwiseQuotient(extrinsic_areas) + extrinsic_areas.cwiseQuotient(extrinsic_areasUV);;
   double extrinsic_max_area_dist = extrinsic_area_dists.maxCoeff() - 2;
   Eigen::VectorXd extrinsic_area_errors = (extrinsic_areasUV - extrinsic_areas).cwiseAbs();
   double extrinsic_average_area_error = extrinsic_area_errors.sum();
 
   // intrinsic metrics
   F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>(); 
+  UV = UV_o;
   Eigen::VectorXd intrinsic_areas(F.rows());
   int i = 0;
   for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
@@ -291,15 +298,20 @@ void compute_metrics(DataGeo &data_mesh, const Eigen::MatrixXd &UV_o, std::vecto
   }
   Eigen::VectorXd intrinsic_areasUV;
   igl::doublearea(UV,F,intrinsic_areasUV);
+  intrinsic_areasUV = intrinsic_areasUV.cwiseAbs();
   intrinsic_areasUV/=2;
+  UV = UV / std::sqrt(intrinsic_areasUV.sum());
+
+  intrinsic_areas /= intrinsic_areas.sum();
+  intrinsic_areasUV /= intrinsic_areasUV.sum();
 
   double intrinsic_flipped = flipped_triangles_intri(data_mesh, UV);
   Eigen::VectorXd intrinsic_angle_dists, intrinsic_angle_errors;
   angle_distortion_intri(data_mesh, UV, intrinsic_angle_errors, intrinsic_angle_dists);
   double intrinsic_average_angle_error = intrinsic_areas.cwiseProduct(intrinsic_angle_errors).sum();
-  double intrinsic_max_angle_dist = intrinsic_angle_dists.maxCoeff();
+  double intrinsic_max_angle_dist = intrinsic_angle_dists.maxCoeff() - 2;
 
-  Eigen::VectorXd intrinsic_area_dists = intrinsic_areasUV.cwiseQuotient(intrinsic_areas);
+  Eigen::VectorXd intrinsic_area_dists = intrinsic_areasUV.cwiseQuotient(intrinsic_areas) + intrinsic_areas.cwiseQuotient(intrinsic_areasUV);;
   double intrinsic_max_area_dist = intrinsic_area_dists.maxCoeff() - 2;
   Eigen::VectorXd intrinsic_area_errors = (extrinsic_areasUV - extrinsic_areas).cwiseAbs();
   double intrinsic_average_area_error = intrinsic_area_errors.sum();
