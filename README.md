@@ -30,6 +30,7 @@ On the menu left, under the category "Parameterization":
 - intrinsic edges
     * Unmarked: Intrinsic edges are not displayed when keys `s,b,c,v` are pressed
     * Marked  : Intrinsic edges are displayed as red edges when keys `s,b,c,v` are pressed
-
+- select one of the energies Dirichlet, symmetric Dirichlet, ASAP, ARAP for parameterization and computing total energy
+- select one of the flipping orders Edge Order, Greedy, Random, Heuristic for the intrinsic flipping algorithm 
 
 
