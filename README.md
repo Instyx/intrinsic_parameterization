@@ -41,8 +41,12 @@ On the menu left, under the category "Parameterization":
 - For ARAP and symmetric Dirichlet energies, respectively the keys 'e', 'r' computes the parameterization but saves the result in a different matrix `UV_o`
 - 'f' for intrinsic flipping algorithm. The UV mapping that is used for the flipping algorithm is saved in `UV_o`
 - 'space' for switching between the UV domain and 3D mesh surface.
-- 's', 'b' for showing the mesh with texture using respectively `UV`, `UV_o`
-- 'c', 'v' for showing the textured 3D mesh and printing the metrics respectively for UV, UV_o
+- 's', 'b' for showing the UV domain using respectively `UV`, `UV_o` and extrinsic geometry. If "intrinsic edges" is marked, then the intrinsic edges are also visualized in th UV domain with different color. 
+- 'c', 'v' for showing the textured 3D mesh and printing the metrics respectively for UV, UV_o. If "intrinsic edges" is marked, then the intrinsic edges are also visualized on the mesh surface with different color. 
+- 'l' for resetting intrinsic triangulation to input extrinsic triangulation
+
+### Example
+
 
 
 [^1]: SLIM always uses free boundary, and the initial UV parameterizations for minimizing ARAP and symmetric Dirichlet are computed with fixed boundary.
