@@ -2,7 +2,7 @@
 
 This is the code that is used for the bachelor thesis "Exploring intrinsic triangulations for optimizing triangle mesh parameterizations" supervised by Prof. Dr. Marc Alexa and Prof. Dr. Olga Sorkine-Hornung. 
 
-Some parts are adapted from my submission to the assigment 4 for the course Shape Modeling and Geometry Processing in 2022 Autumn Semester at ETH Zürich and from the code that is used for iARAP (ARAP Revisited: Discretizing the Elastic Energy using Intrinsic Voronoi Cells).
+Some parts are adapted from my submission to the assigment 4 for the course Shape Modeling and Geometry Processing in 2022 Autumn Semester at ETH Zürich[^1] and from the code that is used for iARAP (ARAP Revisited: Discretizing the Elastic Energy using Intrinsic Voronoi Cells)[^2].
 
 The implementation is in the folder iparam.
 
@@ -21,7 +21,7 @@ make -j6
 ### Menu Items
 
 On the menu left, under the category "Parameterization":
-- `Free boundary`[^1]
+- `Free boundary`[^3]
     * Unmarked: fixed boundary 
     * Marked  : free boundary
 - `ARAP/SLIM iterations`: the number of iterations used for the global/local approach when minimized w.r.t. ARAP, symmetric Dirichlet energies
@@ -48,5 +48,6 @@ On the menu left, under the category "Parameterization":
 ### Example
 
 
-
-[^1]: SLIM always uses free boundary, and the initial UV parameterizations for minimizing ARAP and symmetric Dirichlet are computed with fixed boundary.
+[^1]: (https://igl.ethz.ch/teaching/shape-modeling/sm2022/)
+[^2]: (https://cybertron.cg.tu-berlin.de/projects/iARAP/)
+[^3]: SLIM always uses free boundary, and the initial UV parameterizations for minimizing ARAP and symmetric Dirichlet are computed with fixed boundary.
