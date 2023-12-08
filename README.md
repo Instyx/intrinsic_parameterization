@@ -15,6 +15,7 @@ cd build
 cmake ..
 make -j6
 ```
+The executable `iparam` is built.
 
 ## Usage
 
@@ -38,7 +39,7 @@ On the menu left, under the category "Parameterization":
 ### Keys
 
 - `1`, `2`, `3`, `4`, `5` are used for parameterization respectively for minimizing spring energy (uniform laplacian), Dirichlet energy (cotangent Laplacian), ASAP energy (LSCM), ARAP energy (global/local approach), symmetric Dirichlet energy (SLIM) and the result is saved in the matrix `UV`. 
-- For ARAP and symmetric Dirichlet energies, respectively the keys `e`, `r` computes the parameterization but saves the result in a different matrix `UV_o`
+- For ARAP and symmetric Dirichlet energies, respectively the keys `e`, `r` compute the parameterization but saves the result in a different matrix `UV_o`
 - `f` for intrinsic flipping algorithm. The UV mapping that is used for the flipping algorithm is saved in `UV_o`
 - `space` for switching between the UV domain and 3D mesh surface.
 - `s`, `b` for showing the UV domain using respectively `UV`, `UV_o` and extrinsic geometry. If "intrinsic edges" is marked, then the intrinsic edges are also visualized in th UV domain with different color. 
@@ -47,6 +48,14 @@ On the menu left, under the category "Parameterization":
 
 ### Example
 
+```
+./iparam ../res_data/Octo_cut2.obj
+```
+to run the code with the mesh `Octo_cut2.obj`.
+Select `ASAP` from the menu and press `3`. 
+Then the parameterization is computed, the textured mesh is shown and the total energy normalized with respect to the mesh area is printed out.
+Press 'f' to apply intrinsic flipping algorithm.
+Mark 'intrinsic grad' from the menu left and press `3` again to compute the intrinsic parametrization using the intrinsic triangulation resulting from the intrinsic flipping algorithm.
 
 [^1]: https://igl.ethz.ch/teaching/shape-modeling/sm2022/
 [^2]: https://cybertron.cg.tu-berlin.de/projects/iARAP/
