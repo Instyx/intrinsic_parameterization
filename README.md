@@ -48,6 +48,6 @@ On the menu left, under the category "Parameterization":
 ### Example
 
 
-[^1]: (https://igl.ethz.ch/teaching/shape-modeling/sm2022/)
-[^2]: (https://cybertron.cg.tu-berlin.de/projects/iARAP/)
+[^1]: https://igl.ethz.ch/teaching/shape-modeling/sm2022/
+[^2]: https://cybertron.cg.tu-berlin.de/projects/iARAP/
 [^3]: SLIM always uses free boundary, and the initial UV parameterizations for minimizing ARAP and symmetric Dirichlet are computed with fixed boundary.
