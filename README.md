@@ -21,15 +21,15 @@ make -j6
 ### Menu Items
 
 On the menu left, under the category "Parameterization":
-- Free boundary[^1]
+- `Free boundary`[^1]
     * Unmarked: fixed boundary 
     * Marked  : free boundary
-- ARAP/SLIM iterations: the number of iterations used for the global/local approach when minimized w.r.t. ARAP, symmetric Dirichlet energies
-- Flip granularity: represents after how many iterations of the global/local approaches intrinsic flipping is performed when computing intrinsic parameterization
-- intrinsic grad
+- `ARAP/SLIM iterations`: the number of iterations used for the global/local approach when minimized w.r.t. ARAP, symmetric Dirichlet energies
+- `Flip granularity`: represents after how many iterations of the global/local approaches intrinsic flipping is performed when computing intrinsic parameterization
+- `intrinsic grad`
     * Unmarked: Use extrinsic triangulation for mesh parameterization
     * Marked  : Use intrinsic triangulation for mesh parameterization
-- intrinsic edges
+- `intrinsic edges`
     * Unmarked: Intrinsic edges are not displayed when keys `s,b,c,v` are pressed
     * Marked  : Intrinsic edges are displayed as red edges when keys `s,b,c,v` are pressed
 - select one of the energies Dirichlet, symmetric Dirichlet, ASAP, ARAP for parameterization and computing total energy
@@ -37,13 +37,13 @@ On the menu left, under the category "Parameterization":
 
 ### Keys
 
-- '1', '2', '3', '4', '5' are used for parameterization respectively for minimizing spring energy (uniform laplacian), Dirichlet energy (cotangent Laplacian), ASAP energy (LSCM), ARAP energy (global/local approach), symmetric Dirichlet energy (SLIM) and the result is saved in the matrix `UV`. 
-- For ARAP and symmetric Dirichlet energies, respectively the keys 'e', 'r' computes the parameterization but saves the result in a different matrix `UV_o`
-- 'f' for intrinsic flipping algorithm. The UV mapping that is used for the flipping algorithm is saved in `UV_o`
-- 'space' for switching between the UV domain and 3D mesh surface.
-- 's', 'b' for showing the UV domain using respectively `UV`, `UV_o` and extrinsic geometry. If "intrinsic edges" is marked, then the intrinsic edges are also visualized in th UV domain with different color. 
-- 'c', 'v' for showing the textured 3D mesh and printing the metrics respectively for UV, UV_o. If "intrinsic edges" is marked, then the intrinsic edges are also visualized on the mesh surface with different color. 
-- 'l' for resetting intrinsic triangulation to input extrinsic triangulation
+- `1`, `2`, `3`, `4`, `5` are used for parameterization respectively for minimizing spring energy (uniform laplacian), Dirichlet energy (cotangent Laplacian), ASAP energy (LSCM), ARAP energy (global/local approach), symmetric Dirichlet energy (SLIM) and the result is saved in the matrix `UV`. 
+- For ARAP and symmetric Dirichlet energies, respectively the keys `e`, `r` computes the parameterization but saves the result in a different matrix `UV_o`
+- `f` for intrinsic flipping algorithm. The UV mapping that is used for the flipping algorithm is saved in `UV_o`
+- `space` for switching between the UV domain and 3D mesh surface.
+- `s`, `b` for showing the UV domain using respectively `UV`, `UV_o` and extrinsic geometry. If "intrinsic edges" is marked, then the intrinsic edges are also visualized in th UV domain with different color. 
+- `c`, `v` for showing the textured 3D mesh and printing the metrics respectively for `UV`, `UV_o`. If "intrinsic edges" is marked, then the intrinsic edges are also visualized on the mesh surface with different color. 
+- `l` for resetting intrinsic triangulation to input extrinsic triangulation
 
 ### Example
 
