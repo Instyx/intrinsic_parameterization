@@ -9,16 +9,11 @@
 #include <Eigen/SparseLU>
 
 
-/*** insert any necessary libigl headers here ***/
-#include <igl/sum.h>
-#include <igl/speye.h>
-#include <igl/repdiag.h>
 #include <igl/slim.h>
 #include <igl/harmonic.h>
 #include <igl/map_vertices_to_circle.h>
 
 #include <datageo.hpp>
-#include "geometrycentral/surface/edge_length_geometry.h"
 #include <fstream>
 #include <parameterization.hpp>
 #include <iglslim.hpp>
@@ -49,6 +44,7 @@ Eigen::MatrixXd UV;
 Eigen::MatrixXd UV_o;
 
 DataGeo data_mesh;
+DataGeo data_mesh_o;
 
 igl::SLIMData slimdata;
 
@@ -104,20 +100,17 @@ void Redraw()
   if(colors.size()!=0) viewer.data().set_colors(colors);
 }
 
-bool load_mesh(string filename, bool istest)
+bool load_mesh(DataGeo &datageo, string filename, bool istest)
 {
   igl::read_triangle_mesh(filename,V,F);
-  data_mesh.V=V;
-  data_mesh.F=F;
-  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(F));
-  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, V));
-  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
-  data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->requireFaceAreas();
-  cout << " Vertices: " << data_mesh.intTri->intrinsicMesh->nVertices() << endl;
-  cout << " Edges: " << data_mesh.intTri->intrinsicMesh->nEdges() << endl;
-  cout << " Faces: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
+  datageo.V=V;
+  datageo.F=F;
+  datageo.inputMesh.reset(new gcs::ManifoldSurfaceMesh(F));
+  datageo.inputGeometry.reset(new gcs::VertexPositionGeometry(*datageo.inputMesh, V));
+  datageo.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*datageo.inputMesh, *datageo.inputGeometry));
+  datageo.intTri->requireEdgeLengths();
+  datageo.intTri->requireVertexIndices();
+  datageo.intTri->requireFaceAreas();
 
   if(!istest){
     Redraw();
@@ -127,11 +120,11 @@ bool load_mesh(string filename, bool istest)
   return true;
 }
 
-void reset_datageo(DataGeo &data_mesh){
-  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
-  data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->requireFaceAreas();
+void reset_datageo(DataGeo &datageo){
+  datageo.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  datageo.intTri->requireEdgeLengths();
+  datageo.intTri->requireVertexIndices();
+  datageo.intTri->requireFaceAreas();
 
 }
 
@@ -222,7 +215,7 @@ void test_intflip(){
     string filePath = string(folderPath) + "/" + string(entry->d_name);
 
 
-    load_mesh(filePath, true);
+    load_mesh(data_mesh, filePath, true);
     MatrixXd new_UV;
     // dirichlet
     computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '2');
@@ -447,7 +440,7 @@ void test_intri(){
     string filePath = string(folderPath) + "/" + string(entry->d_name);
     string mesh_name = string(entry->d_name);
 
-    load_mesh(filePath, true);
+    load_mesh(data_mesh, filePath, true);
 
     single_intri(fout, mesh_name, false, 0, '2', EnergyType::DIRICHLET);
     single_intri(fout, mesh_name, false, 1, '3', EnergyType::ASAP);
@@ -604,23 +597,32 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 
 		break;
   }
-  // for comparison
   case 'e':
   {
     MatrixXd new_UV;
     if(UV_o.size()==0) {
       reset_constraints();
-      computeParameterization(data_mesh, V, F, UV_o, new_UV, false , igrad, '2');
+      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, false , igrad, '2');
       UV_o = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+      cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
       reset_constraints();
+      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, freeBoundary, igrad, '4');
+      UV_o = new_UV;
+      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
     }
     //reset=true;
     unsigned its = iterations;
-    while(its--){
-      computeParameterization(data_mesh, V, F, UV_o, new_UV, freeBoundary, igrad, '4');
+    for(unsigned i=0;i<its-1;++i){
+      if(igrad && (i+1)%flip_granularity==0){
+        int flips = 1;
+        while(flips){
+          flips = flip_func(data_mesh_o, UV_o, et);
+          cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+        }
+      }
+      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, freeBoundary, igrad, '4');
       UV_o = new_UV;
-      cout << "energy: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
     }
 
 		break;
@@ -653,21 +655,30 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   }
   // for comparison
   case 'r': {
-    reset_datageo(data_mesh);
+    reset_datageo(data_mesh_o);
     slimdata.has_pre_calc = false;
     if(UV_o.size()==0) {
       reset_constraints();
       MatrixXd new_UV;
-      computeParameterization(data_mesh, V, F, UV_o, new_UV, false, igrad, '2');
+      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, false, igrad, '2');
       UV_o = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+      cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      slim_parameterization(data_mesh_o, slimdata, UV_o, igrad, freeBoundary);
+      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+
     }
     unsigned its = iterations;
-    while(its--){
-      slim_parameterization(data_mesh, slimdata, UV_o, igrad, freeBoundary);
-      cout << "energy: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+    for(unsigned i=0;i<its-1;++i){
+      if(igrad && (i+1)%flip_granularity==0){
+        int flips = 1;
+        while(flips){
+          flips = flip_func(data_mesh_o, UV_o, et);
+          cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+        }
+      }
+      slim_parameterization(data_mesh_o, slimdata, UV_o, igrad, freeBoundary);
+      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
       cout << " energy in slim: " << slimdata.energy << endl;
-      
     }
     break;
   }
@@ -731,6 +742,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     //reset = true;
     //data_mesh.intTri->flipToDelaunay();
     reset_datageo(data_mesh);
+    reset_datageo(data_mesh_o);
     return true;
   }
   // visualize intrinsic edges on the UV domain
@@ -741,10 +753,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     viewer.core().align_camera_center(UV,F);
     if(intrinsic_edges) {
       intrinsicUV(data_mesh.intTri, UV, C1, C2);
-      viewer.data().add_edges(C1, C2, Eigen::RowVector3d(0,0,0));
+      viewer.data().add_edges(C1, C2, Eigen::RowVector3d(1,0,0));
     }
     //reset_datageo(data_mesh);
-    vector<double> res, res1, res2;
     return true;
   }
   // visualize edges on the UV domain with UV_o for comparison
@@ -754,8 +765,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     viewer.data().set_mesh(UV_o, F);
     viewer.core().align_camera_center(UV_o,F);
     if(intrinsic_edges) {
-      intrinsicUV(data_mesh.intTri, UV_o, P1, P2);
-      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,0,0));
+      intrinsicUV(data_mesh_o.intTri, UV_o, P1, P2);
+      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,0,1));
     }
     //reset_datageo(data_mesh);
     return true;
@@ -775,7 +786,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     viewer.core().align_camera_center(V,F);
     if(intrinsic_edges) {
       intrinsicEdges(data_mesh.intTri, V, C1, C2);
-      viewer.data().add_edges(C1, C2, Eigen::RowVector3d(0,0,0));
+      viewer.data().add_edges(C1, C2, Eigen::RowVector3d(1,0,0));
     }
     vector<double> res, res1, res2;
     compute_metrics(data_mesh, UV, res);
@@ -815,8 +826,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     }
     viewer.core().align_camera_center(V,F);
     if(intrinsic_edges) {
-      intrinsicEdges(data_mesh.intTri, V, P1, P2);
-      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,0,0));
+      intrinsicEdges(data_mesh_o.intTri, V, P1, P2);
+      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,0,1));
     }
 
     vector<double> res, res1, res2;
@@ -909,8 +920,13 @@ int main(int argc,char *argv[]) {
   else
   {
     // Read points and normals
-    load_mesh(argv[1], false);
+    load_mesh(data_mesh, argv[1], false);
+    load_mesh(data_mesh_o, argv[1], false);
     print_usage();
+    cout << " Vertices: " << data_mesh.intTri->intrinsicMesh->nVertices() << endl;
+    cout << " Edges: " << data_mesh.intTri->intrinsicMesh->nEdges() << endl;
+    cout << " Faces: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
+
   }
 
   igl::opengl::glfw::imgui::ImGuiPlugin plugin;
@@ -932,10 +948,10 @@ int main(int argc,char *argv[]) {
       ImGui::InputScalar("Flip Remesh Granularity", ImGuiDataType_U32, &flip_granularity, 0, 0);
       ImGui::Checkbox("intrinsic grad", &igrad);
       ImGui::Checkbox("intrinsic edges", &intrinsic_edges);
-      ImGui::RadioButton("drichlet", &option_en, 0);
-      ImGui::RadioButton("symmetric drichlet", &option_en, 1);
-      ImGui::RadioButton("asap", &option_en, 2);
-      ImGui::RadioButton("arap", &option_en, 3);
+      ImGui::RadioButton("Dirichlet", &option_en, 0);
+      ImGui::RadioButton("symmetric Dirichlet", &option_en, 1);
+      ImGui::RadioButton("ASAP", &option_en, 2);
+      ImGui::RadioButton("ARAP", &option_en, 3);
       ImGui::RadioButton("edge order", &option_flip, 0);
       ImGui::RadioButton("greedy", &option_flip, 1);
       ImGui::RadioButton("random", &option_flip, 2);
