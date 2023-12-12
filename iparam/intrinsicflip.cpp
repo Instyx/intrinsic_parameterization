@@ -156,7 +156,7 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
   }
 
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay percentage: " << delaunay << std::endl;
+  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
@@ -211,7 +211,7 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
   }
 
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay percentage: " << delaunay << std::endl;
+  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
@@ -263,7 +263,7 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
     }
   }
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay percentage: " << delaunay << std::endl;
+  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
@@ -309,7 +309,7 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
 
   }
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay percentage: " << delaunay << std::endl;
+  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 

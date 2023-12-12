@@ -498,7 +498,7 @@ Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
     result.insert(pt.edge.secondVertex().getIndex()) = pt.tEdge;
   }
   else{
-    cout << "FACEEE in b" << endl;
+    cout << "FACE in b" << endl;
   }
   return result;
 }
@@ -628,7 +628,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
 		break;
   }
   // SLIM
-  case '5': {
+  case '5': 
+  {
     if(UV.size()==0) {
       reset_constraints();
       MatrixXd new_UV;
@@ -654,7 +655,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   }
   // for comparison
-  case 'r': {
+  case 'r': 
+  {
     reset_datageo(data_mesh_o);
     slimdata.has_pre_calc = false;
     if(UV_o.size()==0) {
@@ -923,6 +925,7 @@ int main(int argc,char *argv[]) {
     load_mesh(data_mesh, argv[1], false);
     load_mesh(data_mesh_o, argv[1], false);
     print_usage();
+    cout << endl;
     cout << " Vertices: " << data_mesh.intTri->intrinsicMesh->nVertices() << endl;
     cout << " Edges: " << data_mesh.intTri->intrinsicMesh->nEdges() << endl;
     cout << " Faces: " << data_mesh.intTri->intrinsicMesh->nFaces() << endl;
@@ -942,7 +945,6 @@ int main(int argc,char *argv[]) {
 		// Add new group
 		if (ImGui::CollapsingHeader("Parameterization", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			// Expose variable directly ...
 			ImGui::Checkbox("Free boundary", &freeBoundary);
       ImGui::InputScalar("ARAP/SLIM iterations", ImGuiDataType_U32, &iterations, 0, 0);
       ImGui::InputScalar("Flip Remesh Granularity", ImGuiDataType_U32, &flip_granularity, 0, 0);

@@ -1,8 +1,7 @@
 # Exploring intrinsic triangulations for optimizing triangle mesh parameterizations
+This repository contains the code used for the bachelor thesis "Exploring intrinsic triangulations for optimizing triangle mesh parameterizations" supervised by Prof. Dr. Marc Alexa and Prof. Dr. Olga Sorkine-Hornung. 
 
-This is the code that is used for the bachelor thesis "Exploring intrinsic triangulations for optimizing triangle mesh parameterizations" supervised by Prof. Dr. Marc Alexa and Prof. Dr. Olga Sorkine-Hornung. 
-
-Some parts are adapted from my submission to the assigment 4 for the course Shape Modeling and Geometry Processing in 2022 Autumn Semester at ETH Zürich[^1] and from the code that is used for iARAP (ARAP Revisited: Discretizing the Elastic Energy using Intrinsic Voronoi Cells)[^2].
+Some parts are adapted from my submission to the assigment 4 for the course Shape Modeling and Geometry Processing in 2022 Autumn Semester at ETH Zürich[^1] and from the code used for iARAP (ARAP Revisited: Discretizing the Elastic Energy using Intrinsic Voronoi Cells)[^2].
 
 The implementation is in the folder iparam.
 
@@ -13,7 +12,7 @@ git clone --recursive git@github.com:Instyx/intrinsic_parameterization.git
 mkdir build
 cd build 
 cmake ..
-make -j6
+make -j4
 ```
 The executable `iparam` is built.
 
@@ -54,7 +53,7 @@ On the menu left, under the category "Parameterization":
 
 - Select `ASAP` from the menu and press `3`. 
 - Then the parameterization is computed, the textured mesh is shown and the total energy normalized with respect to the mesh area is printed out.
-- Press 'f' to apply intrinsic flipping algorithm.
+- Press `f` to apply intrinsic flipping algorithm.
 - Mark 'intrinsic grad' from the menu left and press `3` again to compute the intrinsic parametrization using the intrinsic triangulation resulting from the intrinsic flipping algorithm.
 - Press `s`, `b` to compare the parametrization with intrinsic parameterization.
 
