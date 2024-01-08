@@ -18,6 +18,7 @@
 #include <parameterization.hpp>
 #include <iglslim.hpp>
 #include <intrinsicflip.hpp>
+#include <test.hpp>
 #include <dirent.h>
 #include <igl/lscm.h>
 #include <igl/arap.h>
@@ -784,35 +785,35 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     {
       viewer.data().set_uv(TextureResolution*UV);
       viewer.data().show_texture = true;
+      vector<double> res, res1, res2;
+      compute_metrics(data_mesh, UV, res);
+      cout << "extrinsic_flipped: " << res[0] << endl
+          << "extrinsic_max_area_dist: " << res[1] << endl
+          << "extrinsic_average_area_error: " << res[2] << endl
+          << "extrinsic_max_angle_dist: " << res[3] << endl
+          << "extrinsic_average_angle_error: " << res[4] << endl
+          << "intrinsic_flipped: " << res[5] << endl
+          << "intrinsic_max_area_dist: " << res[6] << endl
+          << "intrinsic_average_area_error: " << res[7] << endl
+          << "intrinsic_max_angle_dist: " << res[8] << endl
+          << "intrinsic_average_angle_error: " << res[9] << endl;
+      minmax_distortions(V,F, UV, res1);
+      minmax_distortions_intri(data_mesh, UV, res2);
+      cout << " conformal min/max: " << res1[0] << "   " << res1[1] << endl;
+      cout << " intri conformal min/max: " << res2[0] << "   " << res2[1] << endl;
+      cout << " isometric min/max: " << res1[2] << "   " << res1[3] << endl;
+      cout << " intri isometric min/max: " << res2[2] << "   " << res2[3] << endl;
+      cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
+      cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
+      cout << endl;
+
     }
     viewer.core().align_camera_center(V,F);
     if(intrinsic_edges) {
       intrinsicEdges(data_mesh.intTri, V, C1, C2);
       viewer.data().add_edges(C1, C2, Eigen::RowVector3d(1,0,0));
     }
-    vector<double> res, res1, res2;
-    compute_metrics(data_mesh, UV, res);
-    cout << "extrinsic_flipped: " << res[0] << endl
-        << "extrinsic_max_area_dist: " << res[1] << endl
-        << "extrinsic_average_area_error: " << res[2] << endl
-        << "extrinsic_max_angle_dist: " << res[3] << endl
-        << "extrinsic_average_angle_error: " << res[4] << endl
-        << "intrinsic_flipped: " << res[5] << endl
-        << "intrinsic_max_area_dist: " << res[6] << endl
-        << "intrinsic_average_area_error: " << res[7] << endl
-        << "intrinsic_max_angle_dist: " << res[8] << endl
-        << "intrinsic_average_angle_error: " << res[9] << endl;
-    minmax_distortions(V,F, UV, res1);
-    minmax_distortions_intri(data_mesh, UV, res2);
-    cout << " conformal min/max: " << res1[0] << "   " << res1[1] << endl;
-    cout << " intri conformal min/max: " << res2[0] << "   " << res2[1] << endl;
-    cout << " isometric min/max: " << res1[2] << "   " << res1[3] << endl;
-    cout << " intri isometric min/max: " << res2[2] << "   " << res2[3] << endl;
-    cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
-    cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
-    cout << endl;
-
-
+   
     //reset_datageo(data_mesh);
     return true;
   }
@@ -821,41 +822,52 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   {
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
-    if(UV.size() != 0)
+    if(UV_o.size() != 0)
     {
       viewer.data().set_uv(TextureResolution*UV_o);
       viewer.data().show_texture = true;
+      vector<double> res, res1, res2;
+      compute_metrics(data_mesh, UV_o, res);
+      cout << "extrinsic_flipped: " << res[0] << endl
+          << "extrinsic_max_area_dist: " << res[1] << endl
+          << "extrinsic_average_area_error: " << res[2] << endl
+          << "extrinsic_max_angle_dist: " << res[3] << endl
+          << "extrinsic_average_angle_error: " << res[4] << endl
+          << "intrinsic_flipped: " << res[5] << endl
+          << "intrinsic_max_area_dist: " << res[6] << endl
+          << "intrinsic_average_area_error: " << res[7] << endl
+          << "intrinsic_max_angle_dist: " << res[8] << endl
+          << "intrinsic_average_angle_error: "  << res[9] << endl;
+      minmax_distortions(V,F, UV_o, res1);
+      minmax_distortions_intri(data_mesh, UV_o, res2);
+      cout << " conformal min/max: " << res1[0] << "   " << res1[1] << endl;
+      cout << " intri conformal min/max: " << res2[0] << "   " << res2[1] << endl;
+      cout << " isometric min/max: " << res1[2] << "   " << res1[3] << endl;
+      cout << " intri isometric min/max: " << res2[2] << "   " << res2[3] << endl;
+      cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
+      cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
+      cout << endl;
+
     }
     viewer.core().align_camera_center(V,F);
     if(intrinsic_edges) {
       intrinsicEdges(data_mesh_o.intTri, V, P1, P2);
-      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,0,1));
+      viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,1,0));
     }
-
-    vector<double> res, res1, res2;
-    compute_metrics(data_mesh, UV_o, res);
-    cout << "extrinsic_flipped: " << res[0] << endl
-        << "extrinsic_max_area_dist: " << res[1] << endl
-        << "extrinsic_average_area_error: " << res[2] << endl
-        << "extrinsic_max_angle_dist: " << res[3] << endl
-        << "extrinsic_average_angle_error: " << res[4] << endl
-        << "intrinsic_flipped: " << res[5] << endl
-        << "intrinsic_max_area_dist: " << res[6] << endl
-        << "intrinsic_average_area_error: " << res[7] << endl
-        << "intrinsic_max_angle_dist: " << res[8] << endl
-        << "intrinsic_average_angle_error: "  << res[9] << endl;
-    minmax_distortions(V,F, UV_o, res1);
-    minmax_distortions_intri(data_mesh, UV, res2);
-    cout << " conformal min/max: " << res1[0] << "   " << res1[1] << endl;
-    cout << " intri conformal min/max: " << res2[0] << "   " << res2[1] << endl;
-    cout << " isometric min/max: " << res1[2] << "   " << res1[3] << endl;
-    cout << " intri isometric min/max: " << res2[2] << "   " << res2[3] << endl;
-    cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
-    cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
-    cout << endl;
 
     //reset_datageo(data_mesh);
     return true;
+  }
+  case 'h':
+  {
+    if(isDelaunayFlipBad(data_mesh, UV)) cout << "Delaunay increased energy, Baddo" << endl;
+    else cout << "Gooddo" << endl;
+    break;
+  }
+  case 'j':
+  {
+    data_mesh_o = compareIDTvsGreedy(data_mesh);
+    break;
   }
 	case '+':
 		TextureResolution /= 2;
