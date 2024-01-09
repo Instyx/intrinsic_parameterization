@@ -313,3 +313,50 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
   return totalflips;
 }
 
+unsigned delaunay_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireFaceAreas();
+  unsigned totalflips = 0;
+  unsigned delaunay = 0;
+  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+    if(e.isBoundary()) continue;
+    if(data_mesh.intTri->isDelaunay(e)) continue;
+    gcs::Face f1 = e.halfedge().face(); 
+    gcs::Face f2 = e.halfedge().twin().face();
+    Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
+    if(!diamondJacobians(data_mesh, UV, e, J1, J2)) continue;
+    double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
+                    energy(J2) * data_mesh.intTri->faceArea(f2);
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    gcs::Edge flipped = e;
+    diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
+    
+    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+    double tolerance = 1e-6; // set tolerance to 1e-6 
+
+    if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
+      if (before > after) {
+        totalflips++;
+        if(data_mesh.intTri->isDelaunay(e)) delaunay++;
+      }
+      else {
+        data_mesh.intTri->flipEdgeIfPossible(flipped);
+        std::cout << "Delaunay flip increased the energy" << std::endl;
+      }
+    }
+    else {
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+    }
+
+  }
+  data_mesh.intTri->refreshQuantities();
+  std::cout << " delaunay flips: " << delaunay << std::endl;
+  return totalflips;
+}
+
