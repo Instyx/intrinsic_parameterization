@@ -341,3 +341,36 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   return total_energy/areas.sum();
 }
 
+double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et){
+
+  double (*energy)(Eigen::Matrix2d);
+
+  if(et == EnergyType::DIRICHLET) energy = dirichlet;
+  if(et == EnergyType::ASAP) energy = asap;
+  if(et == EnergyType::ARAP) energy = arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+
+  Eigen::VectorXd areas;
+  Eigen::SparseMatrix<double> Dx, Dy;
+
+  computeSurfaceGradientMatrix(V, F, Dx, Dy);
+  igl::doublearea(V, F, areas);
+	areas/=2;
+  
+  Eigen::VectorXd Dxu = Dx * UV.col(0);		
+  Eigen::VectorXd Dxv = Dx * UV.col(1);		
+  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+  Eigen::VectorXd Dyv = Dy * UV.col(1);
+
+  double total_energy = 0;
+  for(int i=0; i<F.rows();++i){
+    Eigen::Matrix2d J;
+		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+    double temp = energy(J)*areas(i);
+    total_energy += energy(J)*areas(i);
+  }
+
+  return total_energy/areas.sum();
+
+}
+

@@ -28,5 +28,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad);
 
+double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
+
 // boundary constraints are stored as static variables, for the purpose of testing this resets the static variables
 void reset_constraints();

@@ -40,6 +40,7 @@ Eigen::MatrixXd V;
 
 // face array, #F x3
 Eigen::MatrixXi F;
+Eigen::MatrixXi F_o;
 // UV coordinates, #V x2
 Eigen::MatrixXd UV;
 Eigen::MatrixXd UV_o;
@@ -54,6 +55,7 @@ int option_flip;
 
 bool showingUV = false;
 bool freeBoundary = false;
+bool onlyDelaunay= false;
 double TextureResolution = 10;
 //igl::opengl::ViewerCore temp3D;
 //igl::opengl::ViewerCore temp2D;
@@ -552,6 +554,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   if(option_flip==1) flip_func = greedy_flip;
   if(option_flip==2) flip_func = random_flip;
   if(option_flip==3) flip_func = heuristic_flip;
+  if(option_flip==4) flip_func = delaunay_flip;
 
 	switch (key) {
   // uniform laplacian 
@@ -565,7 +568,14 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     reset=true;
     computeParameterization(data_mesh, V, F, UV, new_UV, freeBoundary, igrad, key);
     UV = new_UV;
-    cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+    // cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+    cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
+    if(F_o.size()!=0){
+      computeParameterization(data_mesh, V, F_o, UV_o, new_UV, freeBoundary, igrad, key);
+      UV_o = new_UV;
+      //cout << "energy F_new: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+      cout << "energy F_new: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
+    }
 		break;
   }
   // ARAP
@@ -575,11 +585,13 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     if(UV.size()==0) {
       computeParameterization(data_mesh, V, F, UV, new_UV, false , igrad, '2');
       UV = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      //cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "Initial energy: " << compute_energy_ext(V, F, UV, et) << endl;
       reset_constraints();
       computeParameterization(data_mesh, V, F, UV, new_UV, freeBoundary, igrad, key);
       UV = new_UV;
-      cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      //cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     }
     //reset=true;
     unsigned its = iterations;
@@ -593,7 +605,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       }
       computeParameterization(data_mesh, V, F, UV, new_UV, freeBoundary, igrad, key);
       UV = new_UV;
-      cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      //cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     }
 
 		break;
@@ -603,13 +616,15 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     MatrixXd new_UV;
     if(UV_o.size()==0) {
       reset_constraints();
-      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, false , igrad, '2');
+      computeParameterization(data_mesh_o, V, F_o, UV_o, new_UV, false , igrad, '2');
       UV_o = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      //cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "Initial energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
       reset_constraints();
-      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, freeBoundary, igrad, '4');
+      computeParameterization(data_mesh_o, V, F_o, UV_o, new_UV, freeBoundary, igrad, '4');
       UV_o = new_UV;
-      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      //cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
     }
     //reset=true;
     unsigned its = iterations;
@@ -621,9 +636,10 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
         }
       }
-      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, freeBoundary, igrad, '4');
+      computeParameterization(data_mesh_o, V, F_o, UV_o, new_UV, freeBoundary, igrad, '4');
       UV_o = new_UV;
-      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      //cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
     }
 
 		break;
@@ -743,10 +759,23 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   {
     //igl::lscm(V,F,UV);
     //reset = true;
-    //data_mesh.intTri->flipToDelaunay();
+   
+    data_mesh.intTri->flipToDelaunay();
+    MatrixXd new_UV;
+    computeParameterization(data_mesh, V, F, UV_o, new_UV, false, true, '2');
+    UV_o = new_UV;
+    cout << "IDT: " << compute_total_energy(data_mesh, UV_o, EnergyType::DIRICHLET, true) << endl;
     reset_datageo(data_mesh);
-    reset_datageo(data_mesh_o);
+    computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '2');
+    UV = new_UV;
+    while(greedy_flip(data_mesh, UV, EnergyType::DIRICHLET));
+    computeParameterization(data_mesh, V, F, UV, new_UV, false, true, '2');
+    UV = new_UV;
+    cout << "greedy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << endl;
+    
+   // reset_datageo(data_mesh);
     return true;
+    
   }
   // visualize intrinsic edges on the UV domain
   case 's':
@@ -781,10 +810,12 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   {
     viewer.data().clear();
     viewer.data().set_mesh(V, F);
+		viewer.data().set_face_based(true);
     if(UV.size() != 0)
     {
       viewer.data().set_uv(TextureResolution*UV);
       viewer.data().show_texture = true;
+      /*
       vector<double> res, res1, res2;
       compute_metrics(data_mesh, UV, res);
       cout << "extrinsic_flipped: " << res[0] << endl
@@ -806,6 +837,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
       cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
       cout << endl;
+      */
 
     }
     viewer.core().align_camera_center(V,F);
@@ -821,11 +853,13 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   case 'v':
   {
     viewer.data().clear();
-    viewer.data().set_mesh(V, F);
+    viewer.data().set_mesh(V, F_o);
+		viewer.data().set_face_based(true);
     if(UV_o.size() != 0)
     {
       viewer.data().set_uv(TextureResolution*UV_o);
       viewer.data().show_texture = true;
+      /*
       vector<double> res, res1, res2;
       compute_metrics(data_mesh, UV_o, res);
       cout << "extrinsic_flipped: " << res[0] << endl
@@ -847,9 +881,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       cout << " authalic min/max: " << res1[4] << "   " << res1[5] << endl;
       cout << " intri authalic min/max: " << res2[4] << "   " << res2[5] << endl;
       cout << endl;
-
+    */
     }
-    viewer.core().align_camera_center(V,F);
+    viewer.core().align_camera_center(V,F_o);
     if(intrinsic_edges) {
       intrinsicEdges(data_mesh_o.intTri, V, P1, P2);
       viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,1,0));
@@ -860,9 +894,15 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   }
   case 'h':
   {
-    if(isDelaunayFlipBad(data_mesh, UV)) cout << "Delaunay increased energy, Baddo" << endl;
-    else cout << "Gooddo" << endl;
-    break;
+    //if(isDelaunayFlipBad(data_mesh, UV)) cout << "Delaunay increased energy, Baddo" << endl;
+    //else cout << "Gooddo" << endl;
+    cout << " flipso: " << flipEdgesifCoplanar(data_mesh, onlyDelaunay) << endl;
+    F_o = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+    viewer.data().clear();
+    viewer.data().set_mesh(V, F_o);
+		viewer.data().set_face_based(true);
+    //F=F_o;
+    return true;
   }
   case 'j':
   {
@@ -962,6 +1002,7 @@ int main(int argc,char *argv[]) {
       ImGui::InputScalar("Flip Remesh Granularity", ImGuiDataType_U32, &flip_granularity, 0, 0);
       ImGui::Checkbox("intrinsic grad", &igrad);
       ImGui::Checkbox("intrinsic edges", &intrinsic_edges);
+      ImGui::Checkbox("only delaunay", &onlyDelaunay);
       ImGui::RadioButton("Dirichlet", &option_en, 0);
       ImGui::RadioButton("symmetric Dirichlet", &option_en, 1);
       ImGui::RadioButton("ASAP", &option_en, 2);
@@ -970,6 +1011,7 @@ int main(int argc,char *argv[]) {
       ImGui::RadioButton("greedy", &option_flip, 1);
       ImGui::RadioButton("random", &option_flip, 2);
       ImGui::RadioButton("heuristic", &option_flip, 3);
+      ImGui::RadioButton("delaunay", &option_flip, 4);
 
 		}
 	};
