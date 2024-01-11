@@ -1,6 +1,8 @@
 Tolerance tol is used for checking co-planarity comparison. Delaunay means all possible co-planar Delaunay flips are performed.
 Orig stands for original, mod stands for modified (after the flips).
 
+You can click on the images to view full size.
+
 | Method      | Co-planar Flips | Energy Orig | Energy Mod | Texture Orig | Texture Mod |
 | :---------: | :------------: | :---------: | :--------: | :----------: | :---------: |
 |  ARAP, free |  50206, tol=1e-8         | 0.28221     | 0.28228    | <img align="center" src="./superman_arap1_orig_tol8.png" width="300"> | <img align="center" src="./superman_arap1_mod_tol8.png" width="300"> |
