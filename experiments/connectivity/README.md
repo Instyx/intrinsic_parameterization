@@ -12,3 +12,5 @@ You can click on the images to view full size.
 | ARAP, fixed | 22575,  tol=1e-8        | 2.90685     | 2.9089     | <img align="center" src="./vaselion_arap0_orig_tol8.png" width="300">     | <img align="center" src="./vaselion_arap0_mod_tol8.png" width="300">     |
 | ARAP, free  | 22575,  tol=1e-8        | 0.530081    | 0.530254   | <img align="center" src="./vaselion_arap1_orig_tol8.png" width="300">     | <img align="center" src="./vaselion_arap1_mod_tol8.png" width="300">     |
 | Dirichlet   | 464, Delaunay, tol=1e-9 | 0.00012     | 0.00012    | <img align="center" src="./stripe_dirichlet_orig_tol9_d.png" width="300"> | <img align="center" src="./stripe_dirichlet_mod_tol9_d.png" width="300"> |
+| ARAP, fixed | 2166, tol=1e-8          | 1.02528     | 1.02520    | <img align="center" src="./stripe_arap0_orig_tol8.png" width="300">       | <img align="center" src="./stripe_arap0_mod_tol8.png" width="300">       |
+
