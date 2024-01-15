@@ -8,7 +8,8 @@
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(data_mesh.intTri->isDelaunay(e)) continue;
-    double diff = flippeddiff(data_mesh, UV, e, EnergyType::DIRICHLET);
+    if(e.isBoundary()) continue;
+    double diff = flippeddiff(data_mesh, UV, e, EnergyType::ASAP);
     if(diff==0) std::cout << "Deluanay flip not possible" << std::endl;
     if(diff>0) return true;
   }

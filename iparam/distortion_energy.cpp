@@ -2,6 +2,7 @@
 #include <math.h>
 #include <svd.hpp>
 #include <iostream>
+#include <igl/polar_svd.h>
 
 double dirichlet(Eigen::Matrix2d J){
   return J.norm()*J.norm();
@@ -17,6 +18,16 @@ double symmetric_dirichlet(Eigen::Matrix2d J){
     std::cout << " negative dirichlet infinity " << std::endl;
     return 1e8; // should be inf
   }
+}
+
+
+double symmetric_dirichlet_alt(Eigen::Matrix2d J){
+  Eigen::Matrix2d ri, ti, ui, vi;
+  Eigen::Vector2d sing;
+  igl::polar_svd(J, ri, ti, ui, sing, vi);
+  double s1 = sing(0);
+  double s2 = sing(1);
+  return pow(s1, 2) + pow(s1, -2) + pow(s2, 2) + pow(s2, -2);
 }
 
 double arap(Eigen::Matrix2d J){

@@ -21,7 +21,7 @@ void boundary(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool isFreeBou
 }
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   
-  auto energy = symmetric_dirichlet;
+  auto energy = symmetric_dirichlet_alt;
   Eigen::SparseMatrix<double> Dx, Dy;
   Eigen::VectorXd areas;
   if(false){
@@ -53,11 +53,8 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   return total_energy/total_area;
 }
 
-void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary){
+void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary){
 
-  Eigen::MatrixXd V = data_mesh.V;
-  Eigen::MatrixXi F = data_mesh.F;
- 
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
 

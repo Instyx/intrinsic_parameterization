@@ -10,7 +10,7 @@
 //        igrad: whether to use intrinsic properties
 //        isFreeBoundary: not used (always boundary-free)
 // Output: UV : new UV vertex positions
-void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary);
+void slim_parameterization(DataGeo &data_mesh, igl::SLIMData &slimdata, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, bool igrad, bool isFreeBoundary);
 
 // mapping boundary vertices to UV domain
 // Input: V : #vertices x 3 vertex positions 
