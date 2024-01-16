@@ -17,6 +17,7 @@
 #include <fstream>
 #include <parameterization.hpp>
 #include <iglslim.hpp>
+#include <intrinsicslim.hpp>
 #include <intrinsicflip.hpp>
 #include <test.hpp>
 #include <dirent.h>
@@ -568,7 +569,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     reset=true;
     computeParameterization(data_mesh, V, F, UV, new_UV, freeBoundary, igrad, key);
     UV = new_UV;
-    // cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+    // cout << "energy sadf: " << compute_total_energy(data_mesh, UV, et, true) << endl;
     cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     if(F_o.size()!=0){
       computeParameterization(data_mesh, V, F_o, UV_o, new_UV, freeBoundary, igrad, key);
@@ -701,27 +702,31 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     }
     break;
   }
-  /* for debugging purposes
+  // for debugging purposes
   case '6': {
+    MatrixXd new_UV = UV;
     if(UV.size()==0) {
-      MatrixXd new_UV;
       computeParameterization(data_mesh, V, F, UV, new_UV, false, igrad, '2');
-      UV = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "Initial energy: " << compute_energy_ext(V, F, new_UV, et) << endl;;
     }
-    if(!slimdata.has_pre_calc){
-      cout << " aaa " << endl;
-      Eigen::MatrixXd fixed_UV_positions;
-      Eigen::VectorXi fixed_UV_indices;
-      boundary(V,F,freeBoundary,fixed_UV_indices, fixed_UV_positions);
-      igl::slim_precompute(V,F,UV,slimdata, igl::MappingEnergyType::SYMMETRIC_DIRICHLET, fixed_UV_indices, fixed_UV_positions, 0);
-    }
-    cout << "it: " << iterations << endl;
-    igl::slim_solve(slimdata, iterations);
-    UV=slimdata.V_o;
-    cout << slimdata.energy << endl;
+    
+    UV = intrinsicslim(data_mesh, V, F, new_UV, iterations, flip_granularity, FlipType::GREEDY);
+    cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     break;
   }
+
+  case '7': {
+    MatrixXd new_UV = UV_o;
+    if(UV_o.size()==0) {
+      computeParameterization(data_mesh, V, F_o, UV_o, new_UV, false, igrad, '2');
+      cout << "Initial energy: " << compute_energy_ext(V, F_o, new_UV, et) << endl;;
+    }
+    
+    UV_o = intrinsicslim(data_mesh, V, F_o, new_UV, iterations, flip_granularity, FlipType::GREEDY);
+    cout << "energy: " << compute_energy_ext(V, F_o, UV, et) << endl;
+    break;
+  }
+  /*
   case '7':
     {
     Eigen::VectorXi fixed_UV_indices;

@@ -8,15 +8,10 @@ double dirichlet(Eigen::Matrix2d J){
 }
 
 double symmetric_dirichlet(Eigen::Matrix2d J){
-  if(J.determinant()>=0){
-    Eigen::Matrix2d U, S, VV;
-    SSVD2x2(J, U, S, VV);
-    return S(0,0)*S(0,0) + 1/(S(0,0)*S(0,0)) + S(1,1)*S(1,1)+1/(S(1,1)*S(1,1));
-  }
-  else{
-    std::cout << " negative dirichlet infinity " << std::endl;
-    return 1e8; // should be inf
-  }
+  // check also with polar svd instead of SSVD2x2
+  Eigen::Matrix2d U, S, VV;
+  SSVD2x2(J, U, S, VV);
+  return S(0,0)*S(0,0) + 1/(S(0,0)*S(0,0)) + S(1,1)*S(1,1)+1/(S(1,1)*S(1,1));
 }
 
 double arap(Eigen::Matrix2d J){
