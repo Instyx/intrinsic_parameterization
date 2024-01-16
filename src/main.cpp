@@ -12,6 +12,7 @@
 #include <igl/slim.h>
 #include <igl/harmonic.h>
 #include <igl/map_vertices_to_circle.h>
+#include <igl/boundary_loop.h>
 
 #include <datageo.hpp>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include <iglslim.hpp>
 #include <intrinsicslim.hpp>
 #include <intrinsicflip.hpp>
+#include <intrinsicslim.hpp>
 #include <test.hpp>
 #include <dirent.h>
 #include <igl/lscm.h>
@@ -649,13 +651,14 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   case '5': 
   {
     if(UV.size()==0) {
-      reset_constraints();
       MatrixXd new_UV;
       computeParameterization(data_mesh, V, F, UV, new_UV, false, igrad, '2');
       UV = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
-      slim_parameterization(data_mesh, slimdata, UV, igrad, freeBoundary);
-      cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      //cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "Initial energy: " << compute_energy_ext(V, F, UV, et) << endl;
+      slim_parameterization(data_mesh, slimdata, V, F, UV, igrad, freeBoundary);
+      //cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     }
     unsigned its = iterations;
     for(unsigned i=0;i<its-1;++i){
@@ -666,8 +669,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
         }
       }
-      slim_parameterization(data_mesh, slimdata, UV, igrad, freeBoundary);
-      cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      slim_parameterization(data_mesh, slimdata, V, F, UV, igrad, freeBoundary);
+      //cout << "energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
       cout << " energy in slim: " << slimdata.energy << endl;
     }
     break;
@@ -680,12 +684,13 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     if(UV_o.size()==0) {
       reset_constraints();
       MatrixXd new_UV;
-      computeParameterization(data_mesh_o, V, F, UV_o, new_UV, false, igrad, '2');
+      computeParameterization(data_mesh_o, V, F_o, UV_o, new_UV, false, igrad, '2');
       UV_o = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
-      slim_parameterization(data_mesh_o, slimdata, UV_o, igrad, freeBoundary);
-      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
-
+      //cout << "Initial energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "Initial energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
+      slim_parameterization(data_mesh_o, slimdata, V, F_o, UV_o, igrad, freeBoundary);
+      //cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
     }
     unsigned its = iterations;
     for(unsigned i=0;i<its-1;++i){
@@ -696,13 +701,13 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
         }
       }
-      slim_parameterization(data_mesh_o, slimdata, UV_o, igrad, freeBoundary);
-      cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      slim_parameterization(data_mesh_o, slimdata, V, F_o, UV_o, igrad, freeBoundary);
+      //cout << "energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
+      cout << "energy: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
       cout << " energy in slim: " << slimdata.energy << endl;
     }
     break;
   }
-  // for debugging purposes
   case '6': {
     MatrixXd new_UV = UV;
     if(UV.size()==0) {
@@ -725,40 +730,6 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     UV_o = intrinsicslim(data_mesh, V, F_o, new_UV, iterations, flip_granularity, FlipType::GREEDY);
     cout << "energy: " << compute_energy_ext(V, F_o, UV, et) << endl;
     break;
-  }
-  /*
-  case '7':
-    {
-    Eigen::VectorXi fixed_UV_indices;
-    Eigen::MatrixXd fixed_UV_positions;
-    igl::boundary_loop(F, fixed_UV_indices);
-    igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
-    igl::ARAPData arapdata;
-    igl::arap_precomputation(V,F,2,fixed_UV_indices, arapdata);
-    arapdata.max_iter = 10;
-    MatrixXd new_UV;
-    igl::harmonic(V,F, fixed_UV_indices, fixed_UV_positions, 1 , new_UV);
-    igl::arap_solve(fixed_UV_positions, arapdata, new_UV);
-    UV = new_UV;
-    cout << " energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
-    break;
-    }
-    */
- // intrinsic flip algorithm
-  case 'f': {
-    if(UV.size()==0) {
-      MatrixXd new_UV;
-      computeParameterization(data_mesh, V, F, UV, new_UV, false, igrad, '2');
-      UV = new_UV;
-      cout << "Initial energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
-    }
-    UV_o = UV;
-    int flips = 1;
-    while(flips){
-      flips = flip_func(data_mesh, UV, et);
-      cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
-    }
-    return true;
   }
   case 'l':
   {
@@ -899,14 +870,17 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   }
   case 'h':
   {
-    //if(isDelaunayFlipBad(data_mesh, UV)) cout << "Delaunay increased energy, Baddo" << endl;
-    //else cout << "Gooddo" << endl;
+    if(isDelaunayFlipBad(data_mesh, UV)) cout << "Delaunay increased energy, Baddo" << endl;
+    else cout << "Gooddo" << endl;
+    /*
     cout << " flipso: " << flipEdgesifCoplanar(data_mesh, onlyDelaunay) << endl;
     F_o = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
     viewer.data().clear();
     viewer.data().set_mesh(V, F_o);
 		viewer.data().set_face_based(true);
     //F=F_o;
+    //
+    */
     return true;
   }
   case 'j':

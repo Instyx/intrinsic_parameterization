@@ -35,6 +35,20 @@ double compute_symdir_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   return total_energy/total_area;
 }
 
+void slim_tillconverges(igl::SLIMData& slimdata, unsigned max_iterations){
+  double tol = 1e-8;
+  double past_energy = 0; 
+  double curr_energy = slimdata.energy;
+  unsigned itr = 0;
+  while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
+    igl::slim_solve(slimdata, 1);
+    past_energy = curr_energy;
+    curr_energy = slimdata.energy;
+    ++itr;
+  }
+}
+
+
 
 Eigen::MatrixXd intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &V, Eigen::MatrixXi &F, Eigen::MatrixXd &UV_init,
     unsigned number_iterations, unsigned flip_granularity, const FlipType& ft){
@@ -61,10 +75,11 @@ Eigen::MatrixXd intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &V, Eigen::Mat
 
   unsigned iterations = number_iterations / flip_granularity;
   unsigned rem = number_iterations % flip_granularity;
-  
+ 
+  /*
   while(iterations--){
     Eigen::MatrixXd new_UV = igl::slim_solve(slimdata, flip_granularity);
-    /*
+    
     //intrinsic flipping
     unsigned total_flips;
     while(total_flips=flip_func(data_mesh, new_UV, EnergyType::SYMMETRIC_DIRICHLET)) 
@@ -78,8 +93,59 @@ Eigen::MatrixXd intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &V, Eigen::Mat
     //std::cout << "slim energy: " << slimdata.energy << 
     //  "; intri en: " << compute_symdir_energy(data_mesh, new_UV)  << std::endl;
     slimdata.energy = compute_symdir_energy(data_mesh, new_UV) * 2;
-    */
   }
-  //std::cout << "slim energy: " << slimdata.energy << std::endl;
+  */
+  slim_tillconverges(slimdata, 50);
+
+  std::cout << "slim energy: " << slimdata.energy << std::endl;
   return slimdata.V_o;
+}
+
+
+Eigen::MatrixXd intrinsicslim_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &V, Eigen::MatrixXi &F, Eigen::MatrixXd &UV_init,
+    unsigned max_iterations, const FlipType& ft){
+  igl::SLIMData slimdata;
+
+  Eigen::VectorXd areas;
+  Eigen::SparseMatrix<double> Dx, Dy; 
+  
+  auto flip_func = edgeorder_flip;
+  if(ft==FlipType::GREEDY) flip_func = greedy_flip;
+  if(ft==FlipType::HEURISTIC) flip_func = heuristic_flip;
+  if(ft==FlipType::RANDOM) flip_func = random_flip;
+
+  if(!slimdata.has_pre_calc){
+    Eigen::MatrixXd fixed_UV_positions;
+    Eigen::VectorXi fixed_UV_indices;
+    igl::boundary_loop(F, fixed_UV_indices);
+    igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
+    igl::slim_precompute(V, F, UV_init, slimdata, igl::MappingEnergyType::SYMMETRIC_DIRICHLET,
+        fixed_UV_indices, fixed_UV_positions, 0);
+    //std::cout << "Initial energy: " << slimdata.energy << 
+    //  "; intri en: " << compute_symdir_energy(data_mesh, UV_init)  << std::endl;
+  }
+  unsigned itr = 0;
+  while(itr < max_iterations){
+    slim_tillconverges(slimdata, 50);
+    std::cout << "Energy after slim converges: " << slimdata.energy << std::endl;
+    Eigen::MatrixXd UV = slimdata.V_o;
+    unsigned total_flips;
+    while(total_flips=flip_func(data_mesh, UV, EnergyType::SYMMETRIC_DIRICHLET)) 
+      std::cout << "flips:  " << total_flips << std::endl;
+    computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
+    slimdata.Dx = Dx;
+    slimdata.Dy = Dy;
+    slimdata.mesh_area = areas.sum();
+    slimdata.M = areas*2; // in igl::slim this was the way
+    slimdata.F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+    
+    // *2 is because igl::doublearea is used 
+    double curr_en = compute_symdir_energy(data_mesh, UV) * 2;
+    std::cout << "Energy after intrinsic flipping: " << curr_en << std::endl;
+    slimdata.energy = curr_en;
+    ++itr;
+  }
+
+    return slimdata.V_o;
+
 }
