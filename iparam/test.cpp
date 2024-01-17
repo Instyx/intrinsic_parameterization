@@ -191,36 +191,6 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_
   }
   fout << "\n";
 
-  }
-
-void test_ARAP(){
-  const char* folderPath = "../data";
-  DIR* directory = opendir(folderPath);
-  if (directory == NULL) {
-    std::cerr << "Failed to open directory." << std::endl;
-    return;
-  }
-  std::fstream fout;
-  // opens an existing csv file or creates a new file.
-  fout.open("results_arap.csv", std::ios::out | std::ios::app);
-
-  // Read directory entries
-  struct dirent* entry;
-  while ((entry = readdir(directory)) != NULL) {
-    // Skip "." and ".." entries
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-        continue;
-    }
-    std::string filePath = std::string(folderPath) + "/" + std::string(entry->d_name);
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-    DataGeo data_mesh, data_mesh_idt;
-    igl::read_triangle_mesh(filePath,V,F);
-    test_ARAP_single(V, F, std::string(entry->d_name), true, fout);
-  }
-  fout.close();
-  // Close the directory
-  closedir(directory);
 }
 
 void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name,  std::fstream &fout){
@@ -455,6 +425,45 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   }
   fout << "\n";
 
+}
+
+void test_all(){
+  const char* folderPath = "../data";
+  DIR* directory = opendir(folderPath);
+  if (directory == NULL) {
+    std::cerr << "Failed to open directory." << std::endl;
+    return;
   }
+  std::fstream fout_dirichlet, fout_asap, fout_arap, fout_symdirichlet;
+  // opens an existing csv file or creates a new file.
+  fout_arap.open("results_arap.csv", std::ios::out | std::ios::app);
+  fout_asap.open("results_asap.csv", std::ios::out | std::ios::app);
+  fout_dirichlet.open("results_dirichlet.csv", std::ios::out | std::ios::app);
+  fout_symdirichlet.open("results_symdirichlet.csv", std::ios::out | std::ios::app);
+
+  // Read directory entries
+  struct dirent* entry;
+  while ((entry = readdir(directory)) != NULL) {
+    // Skip "." and ".." entries
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        continue;
+    }
+    std::string filePath = std::string(folderPath) + "/" + std::string(entry->d_name);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    DataGeo data_mesh, data_mesh_idt;
+    igl::read_triangle_mesh(filePath,V,F);
+    test_ARAP_single(V, F, std::string(entry->d_name), true, fout_arap);
+    test_Dirichlet_single(V, F, std::string(entry->d_name), fout_dirichlet);
+    test_ASAP_single(V, F, std::string(entry->d_name), true, fout_asap);
+    test_SymDirichlet_single(V, F, std::string(entry->d_name), fout_symdirichlet);
+  }
+  fout_arap.close();
+  fout_asap.close();
+  fout_dirichlet.close();
+  fout_symdirichlet.close();
+  // Close the directory
+  closedir(directory);
+}
 
 
