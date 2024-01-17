@@ -375,7 +375,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   }
   case '6': {
-    test_ARAP();
+    //test_ARAP();
     break;
   }
 
@@ -601,7 +601,7 @@ void print_usage(){
 int main(int argc,char *argv[]) {
   // evaluation
   if(argc != 2) {
-    test_ARAP();
+    test_all();
     return 0;
   }
 
