@@ -2,7 +2,22 @@ cmake_minimum_required(VERSION 3.16)
 #set(CMAKE_CXX_STANDARD 17)
 project(iparam)
 
-
+# include(FetchContent)
+# FetchContent_Declare(
+#   tinyad
+#   GIT_REPOSITORY https://github.com/patr-schm/tinyad.git
+#   GIT_TAG 29417031c185b6dc27b6d4b684550d844459b735
+# )
+# #FetchContent_MakeAvailable(tinyad)
+#
+# FetchContent_GetProperties(tinyad)
+# if(NOT tinyad_POPULATED)
+#   # Fetch the content using previously declared details
+#   FetchContent_Populate(tinyad)
+#   message(STATUS "tinyad_SOURCE_DIR: ${tinyad_SOURCE_DIR}")
+#   message(STATUS "tinyad_BINARY_DIR: ${tinyad_BINARY_DIR}")
+#   add_subdirectory(${tinyad_SOURCE_DIR} ${tinyad_BINARY_DIR})
+# endif()
 
 
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -25,13 +40,17 @@ igl_include(imgui)
 
 
 # Add your project files
-file(GLOB SRC_FILES src/*.cpp)
+# file(GLOB SRC_FILES src/*.cpp)
 file(GLOB IPARAM_FILES iparam/*.cpp)
 file(GLOB IPARAM_HEADERS iparam/*.hpp)
 add_library(iparam_core STATIC ${IPARAM_FILES} ${IPARAM_HEADERS})
 target_include_directories(iparam_core PUBLIC iparam)
 target_link_libraries(iparam_core PUBLIC igl::glfw igl::opengl igl::imgui geometry-central)
 
-add_executable(${PROJECT_NAME} ${SRC_FILES} ${IPARAM_HEADERS})
-target_link_libraries(${PROJECT_NAME} PUBLIC iparam_core) 
-target_compile_options(${PROJECT_NAME} PRIVATE -O3) 
+add_executable(cli src/cli.cpp ${IPARAM_HEADERS})
+target_link_libraries(cli PUBLIC iparam_core)
+target_compile_options(cli PRIVATE -O3)
+
+add_executable(${PROJECT_NAME} src/main.cpp ${IPARAM_HEADERS})
+target_link_libraries(${PROJECT_NAME} PUBLIC iparam_core)
+target_compile_options(${PROJECT_NAME} PRIVATE -O3)

@@ -41,11 +41,11 @@ DataGeo compareIDTvsGreedy(DataGeo &data_mesh){
   computeParameterization(data_mesh, data_mesh.V, data_mesh.F, UV, new_UV, false, true, '2');
   UV = new_UV;
   std::cout << "Intrinsic Energy: " << std::endl;
-  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, true) << 
-    " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << std::endl; 
+  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, true) <<
+    " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << std::endl;
 
   std::cout << "Extrinsic Energy: " << std::endl;
-  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, false) << 
+  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, false) <<
     " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, false) << std::endl;
   return data_mesh_idt;
 }
@@ -58,18 +58,18 @@ unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay){
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(e.isBoundary()) continue;
     if(onlyDelaunay && data_mesh.intTri->isDelaunay(e)) continue;
-    
+
     double edge_len_b = data_mesh.intTri->edgeLengths[e];
     data_mesh.intTri->flipEdgeIfPossible(e);
     double edge_len = data_mesh.intTri->edgeLengths[e];
 
-   // std::cout << edge_len << "   " << edge_len_b << std::endl; 
+   // std::cout << edge_len << "   " << edge_len_b << std::endl;
 
-    size_t v1 = data_mesh.intTri->vertexIndices[e.firstVertex()]; 
+    size_t v1 = data_mesh.intTri->vertexIndices[e.firstVertex()];
     size_t v2 = data_mesh.intTri->vertexIndices[e.secondVertex()];
     Eigen::RowVector3d vec = V.row(v1) - V.row(v2);
     double vec_norm = vec.norm();
-   
+
     // flip back if not coplanar
     if(std::abs(vec_norm-edge_len)>tolarence) data_mesh.intTri->flipEdgeIfPossible(e);
     else total_flips++;
@@ -124,7 +124,7 @@ bool load_mesh_test(DataGeo &datageo, Eigen::MatrixXd &V, Eigen::MatrixXi &F, st
 
   return true;
 }
-void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBoundary, std::ostream &fout){
   //extrinsic
   std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
   Eigen::MatrixXd UV_ext;
@@ -135,7 +135,7 @@ void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBou
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   fout << mesh_name << "," << "ext" << ",";
-  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ","; 
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ",";
   fout << total_iterations <<  "," << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ARAP , false) << ",";
   for(int i = 0; i<350;++i){
     fout << -1 << ",";
@@ -143,7 +143,7 @@ void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBou
   fout << "\n";
 
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   DataGeo data_mesh_idt;
   data_mesh_idt.V = data_mesh.V;
@@ -164,9 +164,9 @@ void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBou
   total_iterations = ARAP_tillconverges(data_mesh_idt, UV_int_init, UV_int, 1000, isFreeBoundary, true);
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
+
   fout << mesh_name << "," << "idt" << ",";
-  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ","; 
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ",";
   fout << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
   for(int i = 0; i<350;++i){
     fout << -1 << ",";
@@ -191,9 +191,9 @@ void test_ARAP(){
     std::cerr << "Failed to open directory." << std::endl;
     return;
   }
-  std::fstream fout;
+  std::ofstream fout;
   // opens an existing csv file or creates a new file.
-  fout.open("results_arap.csv", std::ios::out | std::ios::app);
+  fout.open("results_arap.csv");
 
   // Read directory entries
   struct dirent* entry;

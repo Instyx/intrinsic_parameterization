@@ -4,27 +4,27 @@
 #include "distortion_energy.hpp"
 
 // Input : data_mesh : data structure for intrinsic triangulation
-//         V : #vertices x 3 : mesh input 
+//         V : #vertices x 3 : mesh input
 //         UV : #vertices x 2 : initial UV vertex positions (needed for ARAP)
 //         isFreeBoundary : true if free boundary, false if fixed boundary
-//         igrad : true for using with intrinsic triangulation 
+//         igrad : true for using with intrinsic triangulation
 //                 false for using with extrinsic input triangulation
 //         type : '1' : uniform laplacian
 //                '2' : cotangent laplacian
 //                '3' : lscm
 //                '4' : ARAP
-// Output: new_UV : #vertices x 2 : new UV vertex positions 
+// Output: new_UV : #vertices x 2 : new UV vertex positions
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
     bool isFreeBoundary, bool igrad, int type);
 
-// computes the total distortion energy of the mesh normalized by the total area of the mesh 
+// computes the total distortion energy of the mesh normalized by the total area of the mesh
 // Input : data_mesh : data structure for intrinsic triangulation
-//         V : #vertices x 3 : mesh input 
+//         V : #vertices x 3 : mesh input
 //         UV : #vertices x 2 : initial UV vertex positions (needed for ARAP)
 //         et : energy type that is considered for the flip
-//         igrad : true for using with intrinsic triangulation 
+//         igrad : true for using with intrinsic triangulation
 //                 false for using with extrinsic input triangulation
-// Output: returns the total energy normalized by the area of the mesh 
+// Output: returns the total energy normalized by the area of the mesh
 
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad);
 
@@ -39,7 +39,7 @@ void reset_constraints();
 
 unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad);
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout);
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout);
 
 Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad);
 
@@ -50,4 +50,3 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad);
 Eigen::MatrixXd intrinsic_harmonic(DataGeo &data_mesh, unsigned max_iterations);
 
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
-
