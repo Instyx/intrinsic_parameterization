@@ -18,7 +18,6 @@
 #include <fstream>
 #include <parameterization.hpp>
 #include <iglslim.hpp>
-#include <intrinsicslim.hpp>
 #include <intrinsicflip.hpp>
 #include <intrinsicslim.hpp>
 #include <test.hpp>
@@ -709,26 +708,14 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   }
   case '6': {
-    MatrixXd new_UV = UV;
-    if(UV.size()==0) {
-      computeParameterization(data_mesh, V, F, UV, new_UV, false, igrad, '2');
-      cout << "Initial energy: " << compute_energy_ext(V, F, new_UV, et) << endl;;
-    }
-    
-    UV = intrinsicslim(data_mesh, V, F, new_UV, iterations, flip_granularity, FlipType::GREEDY);
-    cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     break;
   }
 
   case '7': {
-    MatrixXd new_UV = UV_o;
-    if(UV_o.size()==0) {
-      computeParameterization(data_mesh, V, F_o, UV_o, new_UV, false, igrad, '2');
-      cout << "Initial energy: " << compute_energy_ext(V, F_o, new_UV, et) << endl;;
-    }
-    
-    UV_o = intrinsicslim(data_mesh, V, F_o, new_UV, iterations, flip_granularity, FlipType::GREEDY);
-    cout << "energy: " << compute_energy_ext(V, F_o, UV, et) << endl;
+    break;
+  }
+  case '8': {
+    compareIDTvsIPARAM(data_mesh, freeBoundary, EnergyType::ARAP, UV_o, UV);
     break;
   }
   case 'l':
@@ -829,7 +816,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   case 'v':
   {
     viewer.data().clear();
-    viewer.data().set_mesh(V, F_o);
+    viewer.data().set_mesh(V, F);
 		viewer.data().set_face_based(true);
     if(UV_o.size() != 0)
     {
@@ -859,7 +846,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
       cout << endl;
     */
     }
-    viewer.core().align_camera_center(V,F_o);
+    viewer.core().align_camera_center(V,F);
     if(intrinsic_edges) {
       intrinsicEdges(data_mesh_o.intTri, V, P1, P2);
       viewer.data().add_edges(P1, P2, Eigen::RowVector3d(0,1,0));

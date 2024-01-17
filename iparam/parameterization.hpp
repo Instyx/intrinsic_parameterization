@@ -30,5 +30,24 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
 
 double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
 
+double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
+    const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et);
+
 // boundary constraints are stored as static variables, for the purpose of testing this resets the static variables
 void reset_constraints();
+
+
+unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad);
+
+unsigned intrinsic_ARAP(DataGeo &data_mesh, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout);
+
+Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad);
+
+Eigen::MatrixXd intrinsic_LSCM(DataGeo &data_mesh, unsigned max_iterations, bool isFreeBoundary);
+
+Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad);
+
+Eigen::MatrixXd intrinsic_harmonic(DataGeo &data_mesh, unsigned max_iterations);
+
+Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
+

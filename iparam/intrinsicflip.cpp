@@ -267,7 +267,7 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
   return totalflips;
 }
 
-unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
@@ -278,7 +278,6 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
-  unsigned delaunay = 0;
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(e.isBoundary()) continue;
     gcs::Face f1 = e.halfedge().face(); 
@@ -297,7 +296,7 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
     if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
       if (before > after) {
         totalflips++;
-        if(data_mesh.intTri->isDelaunay(e)) delaunay++;
+        if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
       }
       else {
         data_mesh.intTri->flipEdgeIfPossible(flipped);
@@ -309,7 +308,6 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
 
   }
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 

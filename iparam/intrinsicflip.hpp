@@ -34,6 +34,6 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
 
 unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
 
-unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
+unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
 
 unsigned delaunay_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);

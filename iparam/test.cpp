@@ -1,10 +1,10 @@
+#include "datageo.hpp"
 #include <intrinsicflip.hpp>
 #include <parameterization.hpp>
 #include <test.hpp>
 #include <iostream>
 
-// FOR DIRICHLET
-
+// to check if deluanay flips always decrease the energy
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(data_mesh.intTri->isDelaunay(e)) continue;
@@ -71,4 +71,46 @@ unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay){
     else total_flips++;
   }
   return total_flips;
+}
+
+void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyType &et, Eigen::MatrixXd &UV_idt, Eigen::MatrixXd &UV_iparam){
+  DataGeo data_mesh_idt;
+  data_mesh_idt.V = data_mesh.V;
+  data_mesh_idt.F = data_mesh.F;
+  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
+  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
+  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
+  data_mesh_idt.intTri->flipToDelaunay();
+
+  Eigen::MatrixXd UV_idt_init;
+
+  reset_constraints();
+  computeParameterization(data_mesh_idt, data_mesh_idt.V, data_mesh_idt.F, UV_idt, UV_idt_init, false, true, '2');
+  UV_idt.resize(data_mesh.V.rows(),2);
+  UV_iparam.resize(data_mesh.V.rows(),2);
+  if(et == EnergyType::ARAP){
+    std::cout << "------ IDT --------" << std::endl;
+    UV_idt = ARAP_tillconverges(data_mesh_idt, UV_idt_init, 500, isFreeBoundary, true);
+    std::cout << "------ IPARAM --------" << std::endl;
+    UV_iparam = intrinsic_ARAP(data_mesh, 150, 20, isFreeBoundary);
+    std::cout << "last IDT energy int: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::ARAP, true) << std::endl;
+    std::cout << "last IDT energy ext: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::ARAP, false) << std::endl;
+    std::cout << "last IPARAM energy int: " << compute_total_energy(data_mesh, UV_iparam, EnergyType::ARAP, true) << std::endl;
+    std::cout << "last IPARAM energy ext: " << compute_total_energy(data_mesh, UV_iparam, EnergyType::ARAP, false) << std::endl;
+
+  }
+  // symmetric Dirichlet
+  /*
+  else{
+    UV_idt
+  }
+  */
+}
+
+
+void test_ARAP(DataGeo &data_mesh, DataGeo &data_mesh_idt, bool isFreeBoundary){
+  
+  Eigen::MatrixXd UV_idt_init = tutte(data_mesh_idt, true);
+  Eigen::MatrixXd UV_idt = ARAP_tillconverges(data_mesh_idt, UV_idt_init, 1000, isFreeBoundary, true);
+  
 }
