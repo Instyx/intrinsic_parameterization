@@ -28,11 +28,11 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
 //         et : energy type that is considered for the flip
 // Output: updates the data_mesh intrinsic triangulation 
 //         and returns the number of flips
-unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
+unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
 
-unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
+unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
 
-unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
+unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
 
 unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
 

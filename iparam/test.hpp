@@ -8,3 +8,5 @@ DataGeo compareIDTvsGreedy(DataGeo &data_mesh);
 unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay);
 
 void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyType &et, Eigen::MatrixXd &UV_idt, Eigen::MatrixXd &UV_iparam);
+
+void test_ARAP();

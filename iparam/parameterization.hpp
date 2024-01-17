@@ -39,7 +39,7 @@ void reset_constraints();
 
 unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad);
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout);
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout);
 
 Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad);
 

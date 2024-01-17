@@ -114,7 +114,7 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   }
 }
 
-unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
@@ -137,7 +137,7 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
     ++i;
   }
 
-  unsigned delaunay = 0;
+  delaunay_flips = 0;
   double tolerance = 1e-6; // set tolerance to 1e-6 
   for (size_t i = 0; i < indices.size(); i++) {
     size_t idx = indices[i];
@@ -145,7 +145,7 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
     gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
     if(e.isBoundary()) continue;
     data_mesh.intTri->flipEdgeIfPossible(e);
-    if(data_mesh.intTri->isDelaunay(e)) delaunay++;
+    if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     visited[idx]=1;
     visited[halfedges[0].edge().getIndex()]=1;
@@ -156,11 +156,10 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
   }
 
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
-unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
@@ -193,7 +192,7 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     heuristic[e] = diffs[e] - (diffs[halfedges[0].edge()]+diffs[halfedges[1].edge()]+diffs[halfedges[2].edge()]+diffs[halfedges[3].edge()]);
   }  
-  unsigned delaunay = 0;
+  delaunay_flips = 0;
   for (size_t i = 0; i < indices.size(); i++) {
     size_t idx = indices[i];
     if(diffs[idx]>=0) continue;
@@ -202,7 +201,7 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     data_mesh.intTri->flipEdgeIfPossible(e);
     visited[idx]=1;
-    if(data_mesh.intTri->isDelaunay(e)) delaunay++;
+    if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
     visited[halfedges[0].edge().getIndex()]=1;
     visited[halfedges[1].edge().getIndex()]=1;
     visited[halfedges[2].edge().getIndex()]=1;
@@ -211,11 +210,10 @@ unsigned heuristic_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ene
   }
 
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
-unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
@@ -231,7 +229,7 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
   std::vector<size_t> indices(data_mesh.intTri->intrinsicMesh->nEdges());
   std::iota(indices.begin(), indices.end(), 0);
   std::shuffle(indices.begin(), indices.end(), std::mt19937 {std::random_device{}()});
-  unsigned delaunay = 0;
+  delaunay_flips = 0;
   for(size_t idx : indices){
     gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
     if(e.isBoundary()) continue;
@@ -252,7 +250,7 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
     if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
       if (before > after) {
         totalflips++;
-      if(data_mesh.intTri->isDelaunay(flipped)) delaunay++;
+      if(data_mesh.intTri->isDelaunay(flipped)) delaunay_flips;
       }
       else {
         data_mesh.intTri->flipEdgeIfPossible(flipped);
@@ -263,7 +261,6 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Energy
     }
   }
   data_mesh.intTri->refreshQuantities();
-  std::cout << " delaunay flips: " << delaunay << std::endl;
   return totalflips;
 }
 
@@ -278,6 +275,7 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned 
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
+  delaunay_flips = 0;
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(e.isBoundary()) continue;
     gcs::Face f1 = e.halfedge().face(); 

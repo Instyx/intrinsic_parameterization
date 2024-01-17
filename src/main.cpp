@@ -133,342 +133,6 @@ void reset_datageo(DataGeo &datageo){
 
 }
 
-// helpfer function for evaluation of intrinsic flipping
-void flip_res(fstream &fout, bool free_boundary, char key, int start_iterations, string mesh_name, double start_energy, const EnergyType &et){
-
-  auto start = std::chrono::high_resolution_clock::now();
-
-  auto end = std::chrono::high_resolution_clock::now();
-
-  unsigned flips = 1;
-  unsigned i = 0;
-  fout << mesh_name << "," << key << "," << free_boundary << "," << "start," << i << "," << start_iterations << "," << start_energy << "," << -1 << '\n';
-  while(flips){
-    start = chrono::high_resolution_clock::now();
-    flips = edgeorder_flip(data_mesh, UV, et);
-    end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    ++i;
-    fout << mesh_name << "," << key << "," << free_boundary << "," << "edge order," << i << "," << flips << ","
-      << compute_total_energy(data_mesh, UV, et, true) << "," << duration << '\n';
-  }
-  reset_datageo(data_mesh);
-  i = 0;
-  flips=1;
-  while(flips){
-    start = chrono::high_resolution_clock::now();
-    flips = greedy_flip(data_mesh, UV, et);
-    end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    ++i;
-    fout << mesh_name << "," << key << "," << free_boundary << "," << "greedy," << i << "," << flips << ","
-      << compute_total_energy(data_mesh, UV, et, true) << "," << duration << '\n';
-  }
-  reset_datageo(data_mesh);
-  i = 0;
-  flips=1;
-  while(flips){
-    start = chrono::high_resolution_clock::now();
-    flips = random_flip(data_mesh, UV, et);
-    end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    ++i;
-    fout << mesh_name << "," << key << "," << free_boundary << "," << "random," << i << "," << flips << ","
-      << compute_total_energy(data_mesh, UV, et, true) << "," << duration << '\n';
-  }
-  reset_datageo(data_mesh);
-  i = 0;
-  flips=1;
-  while(flips){
-    start = chrono::high_resolution_clock::now();
-    flips = heuristic_flip(data_mesh, UV, et);
-    end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    ++i;
-    fout << mesh_name << "," << key << "," << free_boundary << "," << "heuristic," << i << "," << flips << ","
-      << compute_total_energy(data_mesh, UV, et, true) << "," << duration << '\n';
-  }
-  reset_datageo(data_mesh);
-}
-
-
-
-// evaluation of intrinsic flipping
-void test_intflip(){
-  const char* folderPath = "../res_data";
-  DIR* directory = opendir(folderPath);
-  if (directory == NULL) {
-    cerr << "Failed to open directory." << endl;
-    return;
-  }
-  fstream fout;
-  // opens an existing csv file or creates a new file.
-  fout.open("results.csv", ios::out | ios::app);
-
-  // Read directory entries
-  struct dirent* entry;
-  fout << "mesh name," << "type," << "free boundary," << "flipping order," << "flip iteration," << "flips / start iterations," << "energy," << "time"<< '\n';
-  while ((entry = readdir(directory)) != NULL) {
-    // Skip "." and ".." entries
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-        continue;
-    }
-    string filePath = string(folderPath) + "/" + string(entry->d_name);
-
-
-    load_mesh(data_mesh, filePath, true);
-    MatrixXd new_UV;
-    // dirichlet
-    computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '2');
-    UV = new_UV;
-    double start_energy = compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true);
-    flip_res(fout, false, '2', -1, string(entry->d_name), start_energy, EnergyType::DIRICHLET);
-
-    // LSCM fixed
-    computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '3');
-    UV = new_UV;
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ASAP, true);
-    flip_res(fout, false, '3', -1, string(entry->d_name), start_energy, EnergyType::ASAP);
-
-    // ARAP fixed
-    MatrixXd start_UV = UV;
-    computeParameterization(data_mesh, V, F, start_UV, new_UV, false, false, '4');
-    UV = new_UV;
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, false, '4', 1, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-    int iterations = 2;
-    while(iterations--){
-      computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '4');
-      UV = new_UV;
-    }
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, false, '4', 3, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-    iterations = 7;
-    while(iterations--){
-      computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '4');
-      UV = new_UV;
-    }
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, false, '4', 10, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-    // ARAP free
-    reset_constraints();
-    computeParameterization(data_mesh, V, F, start_UV, new_UV, true, false, '4');
-    UV = new_UV;
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, true, '4', 1, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-    iterations = 2;
-    while(iterations--){
-      computeParameterization(data_mesh, V, F, UV, new_UV, true, false, '4');
-      UV = new_UV;
-    }
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, true, '4', 3, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-    iterations = 7;
-    while(iterations--){
-      computeParameterization(data_mesh, V, F, UV, new_UV, true, false, '4');
-      UV = new_UV;
-    }
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    flip_res(fout, true, '4', 10, string(entry->d_name), start_energy, EnergyType::ARAP);
-
-
-    // LSCM free
-    reset_constraints();
-    computeParameterization(data_mesh, V, F, UV, new_UV, true, false, '3');
-    UV = new_UV;
-    start_energy = compute_total_energy(data_mesh, UV, EnergyType::ASAP, true);
-    flip_res(fout, true, '3', -1, string(entry->d_name), start_energy, EnergyType::ASAP);
-
-    reset_constraints();
-  }
-
-  fout.close();
-  // Close the directory
-  closedir(directory);
-}
-
-// helper function for evaluation of intrinsic parameterization for minimizing Dirichlet, ASAP
-void single_intri(fstream &fout, string mesh_name, bool free_boundary, int type, char key, const EnergyType &et){
-    Eigen::MatrixXd new_UV;
-
-    // greedy
-    auto start = chrono::high_resolution_clock::now();
-    computeParameterization(data_mesh, V, F, UV, new_UV, free_boundary, false, key);
-    auto end = chrono::high_resolution_clock::now();
-    UV = new_UV;
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    std::vector<double> res_ext, res_int, res;
-    minmax_distortions(V, F, UV, res_ext);
-    minmax_distortions_intri(data_mesh, UV, res_int);
-    compute_metrics(data_mesh, UV, res);
-
-    fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << 0 << "," << false << "," <<
-      compute_total_energy(data_mesh, UV, et, true) << "," <<  compute_total_energy(data_mesh, UV, et, false) << ","
-      << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-      << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-      << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-      << duration << '\n';
-    start = chrono::high_resolution_clock::now();
-    while(greedy_flip(data_mesh, UV, et));
-    end = chrono::high_resolution_clock::now();
-    duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    minmax_distortions_intri(data_mesh, UV, res_int);
-    compute_metrics(data_mesh, UV, res);
-    fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << 1 << "," << true << "," <<
-      compute_total_energy(data_mesh, UV, et, true) << "," <<  compute_total_energy(data_mesh, UV, et, false) << ","
-      << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-      << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-      << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-      << duration << '\n';
-    start = chrono::high_resolution_clock::now();
-    computeParameterization(data_mesh, V, F, UV, new_UV, free_boundary, true, key);
-    end = chrono::high_resolution_clock::now();
-    duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    double after_igrad_energy = compute_total_energy(data_mesh, new_UV, et, true);
-    minmax_distortions(V, F, new_UV, res_ext);
-    minmax_distortions_intri(data_mesh, new_UV, res_int);
-    compute_metrics(data_mesh, new_UV, res);
-    fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << 2 << "," << false << "," <<
-      compute_total_energy(data_mesh, new_UV, et, true) << "," <<  compute_total_energy(data_mesh, new_UV, et, false) << ","
-    << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-      << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-      << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-      << duration << '\n';
-
-
-    reset_datageo(data_mesh);
-}
-
-// helper function for evaluation of intrinsic parameterization minimizing ARAP
-void single_intri_arap(fstream &fout, string mesh_name, bool free_boundary, int type, unsigned iterations, unsigned granularity, const EnergyType &et){
-    Eigen::MatrixXd new_UV, start_UV;
-
-    // greedy
-    auto start = chrono::high_resolution_clock::now();
-    if(free_boundary) reset_constraints();
-    computeParameterization(data_mesh, V, F, UV, start_UV, false, false, '2');
-    if(free_boundary) reset_constraints();
-    auto end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::vector<double> res_ext, res_int, res;
-    minmax_distortions(V,F, start_UV, res_ext);
-    minmax_distortions_intri(data_mesh, start_UV, res_int);
-    compute_metrics(data_mesh, start_UV, res);
-    fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << 0 << "," << false << "," <<
-      compute_total_energy(data_mesh, start_UV, et, true) << "," <<  compute_total_energy(data_mesh, start_UV, et, false) << ","
-      << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-      << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-      << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-      << duration << '\n';
-    UV = start_UV;
-    unsigned to_add=0;
-  for(unsigned i=0; i<iterations; ++i){
-      if(i!=0 && (i-1)%granularity==0){
-        start = chrono::high_resolution_clock::now();
-        while(greedy_flip(data_mesh, UV, et));
-        end = chrono::high_resolution_clock::now();
-        duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        minmax_distortions_intri(data_mesh, start_UV, res_int);
-        compute_metrics(data_mesh, start_UV, res);
-
-        fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << i+to_add+1 << "," << true << "," <<
-      compute_total_energy(data_mesh, UV, et, true) << "," <<  compute_total_energy(data_mesh, UV, et, false) << ","
-          << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-          << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-          << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-          << duration << '\n';
-        ++to_add;
-      }
-
-    start = chrono::high_resolution_clock::now();
-    computeParameterization(data_mesh, V, F, UV, new_UV, free_boundary, true, '4');
-    UV = new_UV;
-    end = chrono::high_resolution_clock::now();
-    duration = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    minmax_distortions(V,F, UV, res_ext);
-    minmax_distortions_intri(data_mesh, UV, res_int);
-    compute_metrics(data_mesh, UV, res);
-    fout << mesh_name << "," << type << "," << free_boundary << ",greedy," << i+to_add+1 << "," << false << "," <<
-      compute_total_energy(data_mesh, UV, et, true) << "," <<  compute_total_energy(data_mesh, UV, et, false) << ","
-    << res_ext[0] << "," << res_ext[1] << "," << res_ext[2] << "," << res_int[0] << "," <<  res_int[1] << "," << res_int[2] << ","
-      << res_ext[3] << "," << res_ext[4] << "," << res_ext[5] << "," << res_int[3] << "," <<  res_int[4] << "," << res_int[5] << ","
-      << res[0] << "," << res[1] << "," << res[2] << "," << res[3] << "," << res[4] << ","
-      << res[5] << "," << res[6] << "," << res[7] << "," << res[8] << "," << res[9] << ","
-      << duration << '\n';
-
-  }
-
-    reset_datageo(data_mesh);
-}
-
-// evaluation of intrinsic parameterization
-void test_intri(){
-  const char* folderPath = "../res_data";
-  DIR* directory = opendir(folderPath);
-  if (directory == NULL) {
-    cerr << "Failed to open directory." << endl;
-    return;
-  }
-  fstream fout;
-  // opens an existing csv file or creates a new file.
-  fout.open("results_intri.csv", ios::out | ios::app);
-
-  // Read directory entries
-  struct dirent* entry;
-  fout << "mesh_name," << "type," << "is_free_boundary," << "flipping_order," << "iteration," << "is_flip," <<
-    "int_energy," << "ext_energy,"
-    << "conformal_min," << "conformal_max," << "isometric_min," << "conformal_min_int," << "conformal_max_int," << "isometric_min_int,"
-    << "isometric_max," << "auhalic_min," << "authalic_max," << "isometric_max_int," << "auhalic_min_int," << "authalic_max_int,"
-    << "ext_flip_percentage," << "ext_max_area_dist," << "ext_avg_area_err," << "ext_max_angle_dist," << "ext_avg_angle_error,"
-    << "int_flip_percentage," << "int_max_area_dist," << "int_avg_area_err," << "int_max_angle_dist," << "int_avg_angle_error,"
-    << "time"<< '\n';
-  while ((entry = readdir(directory)) != NULL) {
-    // Skip "." and ".." entries
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-        continue;
-    }
-    string filePath = string(folderPath) + "/" + string(entry->d_name);
-    string mesh_name = string(entry->d_name);
-
-    load_mesh(data_mesh, filePath, true);
-
-    single_intri(fout, mesh_name, false, 0, '2', EnergyType::DIRICHLET);
-    single_intri(fout, mesh_name, false, 1, '3', EnergyType::ASAP);
-    reset_constraints();
-    single_intri(fout, mesh_name, true, 2, '3', EnergyType::ASAP);
-    reset_constraints();
-    single_intri_arap(fout, mesh_name, false, 3, 50, 1, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, false, 4, 50, 2, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, false, 5, 50, 6, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, false, 6, 50, 10, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, true, 7, 50, 1, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, true, 8, 50, 2, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, true, 9, 50, 6, EnergyType::ARAP);
-    single_intri_arap(fout, mesh_name, true, 10, 50, 10, EnergyType::ARAP);
-    reset_constraints();
-  }
-
-  fout.close();
-  // Close the directory
-  closedir(directory);
-
-}
-
 // to visualize intrinsic edges on the UV domain
 void intrinsicUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri,Eigen::MatrixXd &UV, Eigen::MatrixXd &P1, Eigen::MatrixXd &P2){
   vector<Eigen::Vector2d> points;
@@ -556,7 +220,6 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   if(option_flip==1) flip_func = greedy_flip;
   if(option_flip==2) flip_func = random_flip;
   if(option_flip==3) flip_func = heuristic_flip;
-  if(option_flip==4) flip_func = delaunay_flip;
 
 	switch (key) {
   // uniform laplacian 
@@ -600,8 +263,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     for(unsigned i=0;i<its-1;++i){
       if(igrad && (i+1)%flip_granularity==0){
         int flips = 1;
+        unsigned del = 0;
         while(flips){
-          flips = flip_func(data_mesh, UV, et);
+          flips = flip_func(data_mesh, UV, del, et);
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
         }
       }
@@ -633,8 +297,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     for(unsigned i=0;i<its-1;++i){
       if(igrad && (i+1)%flip_granularity==0){
         int flips = 1;
+        unsigned del;
         while(flips){
-          flips = flip_func(data_mesh_o, UV_o, et);
+          flips = flip_func(data_mesh_o, UV_o, del, et);
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
         }
       }
@@ -663,8 +328,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     for(unsigned i=0;i<its-1;++i){
       if(igrad && (i+1)%flip_granularity==0){
         int flips = 1;
+        unsigned del;
         while(flips){
-          flips = flip_func(data_mesh, UV, et);
+          flips = flip_func(data_mesh, UV, del, et);
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh, UV, et, true) << endl;
         }
       }
@@ -695,8 +361,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     for(unsigned i=0;i<its-1;++i){
       if(igrad && (i+1)%flip_granularity==0){
         int flips = 1;
+        unsigned del;
         while(flips){
-          flips = flip_func(data_mesh_o, UV_o, et);
+          flips = flip_func(data_mesh_o, UV_o, del, et);
           cout << "  total flips: " << flips << " ;  new energy: " << compute_total_energy(data_mesh_o, UV_o, et, true) << endl;
         }
       }
@@ -708,6 +375,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   }
   case '6': {
+    test_ARAP();
     break;
   }
 
@@ -715,7 +383,7 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     break;
   }
   case '8': {
-    compareIDTvsIPARAM(data_mesh, freeBoundary, EnergyType::ARAP, UV_o, UV);
+    //compareIDTvsIPARAM(data_mesh, freeBoundary, EnergyType::ARAP, UV_o, UV);
     break;
   }
   case 'l':
@@ -731,7 +399,8 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     reset_datageo(data_mesh);
     computeParameterization(data_mesh, V, F, UV, new_UV, false, false, '2');
     UV = new_UV;
-    while(greedy_flip(data_mesh, UV, EnergyType::DIRICHLET));
+    unsigned del;
+    while(greedy_flip(data_mesh, UV, del, EnergyType::DIRICHLET));
     computeParameterization(data_mesh, V, F, UV, new_UV, false, true, '2');
     UV = new_UV;
     cout << "greedy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << endl;
@@ -932,7 +601,7 @@ void print_usage(){
 int main(int argc,char *argv[]) {
   // evaluation
   if(argc != 2) {
-    test_intri();
+    test_ARAP();
     return 0;
   }
 

@@ -111,8 +111,8 @@ Eigen::MatrixXd intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init){
     Eigen::MatrixXd UV = slimdata.V_o;
     
     //intrinsic flipping
-    unsigned total_flips;
-    while(total_flips=flip_func(data_mesh, UV, EnergyType::SYMMETRIC_DIRICHLET)) 
+    unsigned total_flips, del;
+    while(total_flips=flip_func(data_mesh, UV, del, EnergyType::SYMMETRIC_DIRICHLET)) 
       std::cout << "flips: " << total_flips << std::endl; 
 
     std::cout << " Energy after flipping: " << compute_symdir_energy(data_mesh, UV) << std::endl; 

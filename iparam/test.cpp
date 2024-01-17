@@ -3,6 +3,9 @@
 #include <parameterization.hpp>
 #include <test.hpp>
 #include <iostream>
+#include <chrono>
+#include <igl/read_triangle_mesh.h>
+#include <dirent.h>
 
 // to check if deluanay flips always decrease the energy
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
@@ -33,7 +36,8 @@ DataGeo compareIDTvsGreedy(DataGeo &data_mesh){
 
   computeParameterization(data_mesh, data_mesh.V, data_mesh.F, UV, new_UV, false, false, '2');
   UV = new_UV;
-  while(greedy_flip(data_mesh, UV, EnergyType::DIRICHLET));
+  unsigned del;
+  while(greedy_flip(data_mesh, UV, del, EnergyType::DIRICHLET));
   computeParameterization(data_mesh, data_mesh.V, data_mesh.F, UV, new_UV, false, true, '2');
   UV = new_UV;
   std::cout << "Intrinsic Energy: " << std::endl;
@@ -73,6 +77,7 @@ unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay){
   return total_flips;
 }
 
+/*
 void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyType &et, Eigen::MatrixXd &UV_idt, Eigen::MatrixXd &UV_iparam){
   DataGeo data_mesh_idt;
   data_mesh_idt.V = data_mesh.V;
@@ -100,17 +105,111 @@ void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyTyp
 
   }
   // symmetric Dirichlet
-  /*
   else{
     UV_idt
   }
-  */
+}
+*/
+bool load_mesh_test(DataGeo &datageo, Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string filename)
+{
+  igl::read_triangle_mesh(filename,V,F);
+  datageo.V=V;
+  datageo.F=F;
+  datageo.inputMesh.reset(new gcs::ManifoldSurfaceMesh(F));
+  datageo.inputGeometry.reset(new gcs::VertexPositionGeometry(*datageo.inputMesh, V));
+  datageo.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*datageo.inputMesh, *datageo.inputGeometry));
+  datageo.intTri->requireEdgeLengths();
+  datageo.intTri->requireVertexIndices();
+  datageo.intTri->requireFaceAreas();
+
+  return true;
+}
+void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+  //extrinsic
+  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
+  Eigen::MatrixXd UV_ext;
+  Eigen::MatrixXd UV_ext_init = tutte(data_mesh, false);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  unsigned total_iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, 1000, isFreeBoundary, false);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << mesh_name << "," << "ext" << ",";
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ","; 
+  fout << total_iterations <<  "," << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ARAP , false) << ",";
+  for(int i = 0; i<350;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+
+  // IDT 
+  std::cout << "------------ IDT -------------- " <<std::endl;
+  DataGeo data_mesh_idt;
+  data_mesh_idt.V = data_mesh.V;
+  data_mesh_idt.F = data_mesh.F;
+  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
+  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
+  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
+  data_mesh_idt.intTri->requireEdgeLengths();
+  data_mesh_idt.intTri->requireVertexIndices();
+  data_mesh_idt.intTri->requireFaceAreas();
+
+  data_mesh_idt.intTri->flipToDelaunay();
+
+  Eigen::MatrixXd UV_int;
+  Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
+
+  start = std::chrono::high_resolution_clock::now();
+  total_iterations = ARAP_tillconverges(data_mesh_idt, UV_int_init, UV_int, 1000, isFreeBoundary, true);
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  fout << mesh_name << "," << "idt" << ",";
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ","; 
+  fout << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
+  for(int i = 0; i<350;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  //IPARAM
+  std::cout << "------------ IPARAM -------------- " <<std::endl;
+  Eigen::MatrixXd UV_iparam;
+  fout << mesh_name << "," << "iparam" << ",";
+  total_iterations = intrinsic_ARAP(data_mesh, UV_iparam, 1000, 50, isFreeBoundary, fout);
+  for(int i=total_iterations*7;i<350;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
 }
 
+void test_ARAP(){
+  const char* folderPath = "../res_data";
+  DIR* directory = opendir(folderPath);
+  if (directory == NULL) {
+    std::cerr << "Failed to open directory." << std::endl;
+    return;
+  }
+  std::fstream fout;
+  // opens an existing csv file or creates a new file.
+  fout.open("results_arap.csv", std::ios::out | std::ios::app);
 
-void test_ARAP(DataGeo &data_mesh, DataGeo &data_mesh_idt, bool isFreeBoundary){
-  
-  Eigen::MatrixXd UV_idt_init = tutte(data_mesh_idt, true);
-  Eigen::MatrixXd UV_idt = ARAP_tillconverges(data_mesh_idt, UV_idt_init, 1000, isFreeBoundary, true);
-  
+  // Read directory entries
+  struct dirent* entry;
+  while ((entry = readdir(directory)) != NULL) {
+    // Skip "." and ".." entries
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        continue;
+    }
+    std::string filePath = std::string(folderPath) + "/" + std::string(entry->d_name);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    DataGeo data_mesh, data_mesh_idt;
+    load_mesh_test(data_mesh, V, F, filePath);
+    test_ARAP_single(data_mesh, std::string(entry->d_name), true, fout);
+  }
+  fout.close();
+  // Close the directory
+  closedir(directory);
 }

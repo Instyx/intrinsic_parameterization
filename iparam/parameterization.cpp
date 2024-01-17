@@ -315,7 +315,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
   double tol = 1e-8;
   double past_energy = 0;
   double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, igrad);
-  std::cout << " Initial energy: " << curr_energy << std::endl;
+  //std::cout << " Initial energy: " << curr_energy << std::endl;
   unsigned itr = 0;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     // to compute the SVD from the previous iteration
@@ -349,7 +349,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
     past_energy = curr_energy;
     curr_energy = compute_total_energy_fast(data_mesh, UV, Dx, Dy, areas, EnergyType::ARAP);
     ++itr;
-    std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
+    //std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
   }
   return itr;
 }
@@ -362,7 +362,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   UV_init = tutte(data_mesh, false);
   
   double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, false);
-  fout << past_energy;
+  fout << past_energy << ",";
 
   double tol = 1e-8;
   
@@ -376,14 +376,14 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   
-  fout << total_iterations << duration;  
+  fout << total_iterations << "," << duration << ",";  
 
   double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
-  fout << curr_energy;
+  fout << curr_energy << ",";
 
 
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
-    std::cout << "Intrinsic itr. " << itr << ":" << std::endl; 
+    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl; 
     // intrinsic flipping
     unsigned flips, del_flips;
     unsigned total_flips = 0;
@@ -396,8 +396,8 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     }
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    fout << total_flips << total_del_flips << duration;
-    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << std::endl; 
+    fout << total_flips << "," << total_del_flips << "," << duration << ",";
+    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ","; 
 
     // compute parameterization with new intrinsic geometry
     Eigen::MatrixXd new_UV;
@@ -407,12 +407,12 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
-    fout << total_iterations << duration;
+    fout << total_iterations << "," << duration << ",";
 
     UV = new_UV;
     past_energy = curr_energy;
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-    fout << curr_energy;
+    fout << curr_energy << ",";
     ++itr;
   }
   return itr;
@@ -490,8 +490,8 @@ Eigen::MatrixXd intrinsic_LSCM(DataGeo &data_mesh, unsigned max_iterations, bool
   unsigned itr = 0;
   Eigen::MatrixXd UV = UV_init;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
-    unsigned flips;
-    while(flips = greedy_flip(data_mesh, UV, EnergyType::ASAP));
+    unsigned flips, del;
+    while(flips = greedy_flip(data_mesh, UV, del, EnergyType::ASAP));
     UV = LSCM(data_mesh, isFreeBoundary, true);
     past_energy = curr_energy;
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ASAP, true);
@@ -562,8 +562,8 @@ Eigen::MatrixXd intrinsic_harmonic(DataGeo &data_mesh, unsigned max_iterations){
   unsigned itr = 0;
   Eigen::MatrixXd UV = UV_init;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
-    unsigned flips;
-    while(flips = greedy_flip(data_mesh, UV, EnergyType::DIRICHLET));
+    unsigned flips, del;
+    while(flips = greedy_flip(data_mesh, UV, del, EnergyType::DIRICHLET));
     UV = harmonic(data_mesh, true); 
     past_energy = curr_energy;
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true);
