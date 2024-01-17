@@ -6,6 +6,7 @@
 #include <chrono>
 #include <igl/read_triangle_mesh.h>
 #include <dirent.h>
+#include <intrinsicslim.hpp>
 
 // to check if deluanay flips always decrease the energy
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
@@ -110,34 +111,49 @@ void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyTyp
   }
 }
 */
-bool load_mesh_test(DataGeo &datageo, Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string filename)
-{
-  igl::read_triangle_mesh(filename,V,F);
-  datageo.V=V;
-  datageo.F=F;
-  datageo.inputMesh.reset(new gcs::ManifoldSurfaceMesh(F));
-  datageo.inputGeometry.reset(new gcs::VertexPositionGeometry(*datageo.inputMesh, V));
-  datageo.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*datageo.inputMesh, *datageo.inputGeometry));
-  datageo.intTri->requireEdgeLengths();
-  datageo.intTri->requireVertexIndices();
-  datageo.intTri->requireFaceAreas();
-
-  return true;
-}
-void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
-  //extrinsic
-  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
-  Eigen::MatrixXd UV_ext;
-  Eigen::MatrixXd UV_ext_init = tutte(data_mesh, false);
+void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+  
+  //IPARAM
+  std::cout << "------------ IPARAM -------------- " <<std::endl;
+  fout << mesh_name << "," << "iparam" << ",";
 
   auto start = std::chrono::high_resolution_clock::now();
-  unsigned total_iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, 1000, isFreeBoundary, false);
+
+  DataGeo data_mesh;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  Eigen::MatrixXd UV_iparam;
+  unsigned total_iterations = intrinsic_ARAP(data_mesh, UV_iparam, 1000, 50, isFreeBoundary, fout);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << total_iterations << "," <<  duration << ","; // this is total duration
+  for(int i=total_iterations*7;i<350;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  //extrinsic
+  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
   fout << mesh_name << "," << "ext" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  Eigen::MatrixXd UV_ext;
+  Eigen::MatrixXd UV_ext_init = tutte(data_mesh, false);
+  total_iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, 1000, isFreeBoundary, false);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
   fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ","; 
   fout << total_iterations <<  "," << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ARAP , false) << ",";
-  for(int i = 0; i<350;++i){
+  for(int i = 0; i<352;++i){
     fout << -1 << ",";
   }
   fout << "\n";
@@ -145,9 +161,12 @@ void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBou
 
   // IDT 
   std::cout << "------------ IDT -------------- " <<std::endl;
+  fout << mesh_name << "," << "idt" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
   DataGeo data_mesh_idt;
-  data_mesh_idt.V = data_mesh.V;
-  data_mesh_idt.F = data_mesh.F;
+  data_mesh_idt.V = V;
+  data_mesh_idt.F = F;
   data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
   data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
   data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
@@ -160,32 +179,22 @@ void test_ARAP_single(DataGeo &data_mesh,  std::string mesh_name, bool isFreeBou
   Eigen::MatrixXd UV_int;
   Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
 
-  start = std::chrono::high_resolution_clock::now();
   total_iterations = ARAP_tillconverges(data_mesh_idt, UV_int_init, UV_int, 1000, isFreeBoundary, true);
+
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   
-  fout << mesh_name << "," << "idt" << ",";
   fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ","; 
   fout << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
-  for(int i = 0; i<350;++i){
+  for(int i = 0; i<352;++i){
     fout << -1 << ",";
   }
   fout << "\n";
 
-  //IPARAM
-  std::cout << "------------ IPARAM -------------- " <<std::endl;
-  Eigen::MatrixXd UV_iparam;
-  fout << mesh_name << "," << "iparam" << ",";
-  total_iterations = intrinsic_ARAP(data_mesh, UV_iparam, 1000, 50, isFreeBoundary, fout);
-  for(int i=total_iterations*7;i<350;++i){
-    fout << -1 << ",";
   }
-  fout << "\n";
-}
 
 void test_ARAP(){
-  const char* folderPath = "../res_data";
+  const char* folderPath = "../data";
   DIR* directory = opendir(folderPath);
   if (directory == NULL) {
     std::cerr << "Failed to open directory." << std::endl;
@@ -206,10 +215,246 @@ void test_ARAP(){
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     DataGeo data_mesh, data_mesh_idt;
-    load_mesh_test(data_mesh, V, F, filePath);
-    test_ARAP_single(data_mesh, std::string(entry->d_name), true, fout);
+    igl::read_triangle_mesh(filePath,V,F);
+    test_ARAP_single(V, F, std::string(entry->d_name), true, fout);
   }
   fout.close();
   // Close the directory
   closedir(directory);
 }
+
+void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name,  std::fstream &fout){
+
+  std::cout << "------------ IPARAM -------------- " <<std::endl;
+  fout << mesh_name << "," << "iparam" << ",";
+
+  auto start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  Eigen::MatrixXd UV_iparam;
+
+  unsigned total_iterations = intrinsic_harmonic(data_mesh, UV_iparam, 50, fout);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << total_iterations << "," << duration << ","; // this is total duration
+  for(int i=total_iterations*7;i<300;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  //extrinsic
+  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
+  fout << mesh_name << "," << "ext" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  Eigen::MatrixXd UV_ext = harmonic(data_mesh, false);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::DIRICHLET , false) << ","; 
+  for(int i = 0; i<302; ++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  // IDT 
+  std::cout << "------------ IDT -------------- " <<std::endl;
+  fout << mesh_name << "," << "idt" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh_idt;
+  data_mesh_idt.V = V;
+  data_mesh_idt.F = F;
+  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
+  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
+  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
+  data_mesh_idt.intTri->requireEdgeLengths();
+  data_mesh_idt.intTri->requireVertexIndices();
+  data_mesh_idt.intTri->requireFaceAreas();
+
+  data_mesh_idt.intTri->flipToDelaunay();
+
+  Eigen::MatrixXd UV_int = harmonic(data_mesh_idt, true);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::DIRICHLET, true) << ",";
+  for(int i = 0; i<302;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+}
+
+
+void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+
+  std::cout << "------------ IPARAM -------------- " <<std::endl;
+  fout << mesh_name << "," << "iparam" << ",";
+
+  auto start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  Eigen::MatrixXd UV_iparam;
+
+  unsigned total_iterations = intrinsic_LSCM(data_mesh, UV_iparam, 50, true, fout);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << total_iterations << "," << duration << ","; // this is total duration
+  for(int i=total_iterations*7;i<300;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  //extrinsic
+  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
+  fout << mesh_name << "," << "ext" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  Eigen::MatrixXd UV_ext = LSCM(data_mesh, isFreeBoundary, false);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ASAP, false) << ",";
+  for(int i = 0; i<302; ++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  // IDT 
+  std::cout << "------------ IDT -------------- " <<std::endl;
+  fout << mesh_name << "," << "idt" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh_idt;
+  data_mesh_idt.V = V;
+  data_mesh_idt.F = F;
+  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
+  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
+  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
+  data_mesh_idt.intTri->requireEdgeLengths();
+  data_mesh_idt.intTri->requireVertexIndices();
+  data_mesh_idt.intTri->requireFaceAreas();
+
+  data_mesh_idt.intTri->flipToDelaunay();
+
+  Eigen::MatrixXd UV_int = LSCM(data_mesh_idt, isFreeBoundary, true);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ASAP, true) << ",";
+  for(int i = 0; i<302;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+}
+
+void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, std::fstream &fout){
+  
+  //IPARAM
+  std::cout << "------------ IPARAM -------------- " <<std::endl;
+  fout << mesh_name << "," << "iparam" << ",";
+
+  auto start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh;
+  igl::SLIMData slimdata;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  Eigen::MatrixXd UV_iparam;
+  Eigen::MatrixXd UV_iparam_init = tutte(data_mesh, false);
+  
+  unsigned total_iterations = intrinsicslim(data_mesh, UV_iparam_init, UV_iparam, 1000, 50, fout);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  fout << total_iterations << "," <<  duration << ","; // this is total duration
+  for(int i=total_iterations*7;i<350;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  //extrinsic
+  std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
+  fout << mesh_name << "," << "ext" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  Eigen::MatrixXd UV_ext;
+  Eigen::MatrixXd UV_ext_init = tutte(data_mesh, false);
+  igl::SLIMData slimdata_ext;
+  total_iterations = slim_tillconverges(data_mesh, slimdata_ext, V, F, UV_ext_init, 1000, false);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::SYMMETRIC_DIRICHLET , false) << ","; 
+  fout << total_iterations <<  "," << duration << "," << slimdata_ext.energy/2 << ",";
+  for(int i = 0; i<352;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+
+  // IDT 
+  std::cout << "------------ IDT -------------- " <<std::endl;
+  fout << mesh_name << "," << "idt" << ",";
+  start = std::chrono::high_resolution_clock::now();
+
+  DataGeo data_mesh_idt;
+  igl::SLIMData slimdata_idt;
+  data_mesh_idt.V = V;
+  data_mesh_idt.F = F;
+  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
+  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
+  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
+  data_mesh_idt.intTri->requireEdgeLengths();
+  data_mesh_idt.intTri->requireVertexIndices();
+  data_mesh_idt.intTri->requireFaceAreas();
+
+  data_mesh_idt.intTri->flipToDelaunay();
+
+  Eigen::MatrixXd UV_int;
+  Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
+
+  total_iterations = slim_tillconverges(data_mesh_idt, slimdata_idt, V, F, UV_int_init, 1000, true);
+
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ","; 
+  fout << total_iterations << "," << duration << "," << slimdata_idt.energy/2 << ",";
+  for(int i = 0; i<352;++i){
+    fout << -1 << ",";
+  }
+  fout << "\n";
+
+  }
+
+

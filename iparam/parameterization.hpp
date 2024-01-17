@@ -43,11 +43,11 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
 
 Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad);
 
-Eigen::MatrixXd intrinsic_LSCM(DataGeo &data_mesh, unsigned max_iterations, bool isFreeBoundary);
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::fstream &fout);
 
 Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad);
 
-Eigen::MatrixXd intrinsic_harmonic(DataGeo &data_mesh, unsigned max_iterations);
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout);
 
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
 
