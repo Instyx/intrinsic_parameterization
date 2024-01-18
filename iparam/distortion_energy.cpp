@@ -34,7 +34,15 @@ double arap(Eigen::Matrix2d J){
 }
 
 double asap(Eigen::Matrix2d J){
-  return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)+J(0,1)) * (J(1,0)+J(0,1)); 
+  
+  Eigen::Matrix2d ri, ti, ui, vi;
+  Eigen::Vector2d sing;
+  igl::polar_svd(J, ri, ti, ui, sing, vi);
+  double s1 = sing(0);
+  double s2 = sing(1);
+  return ((pow(s1, 2) + pow(s2, 2)) / (2 * s1 * s2));
+  
+ // return (J(0,0)-J(1,1)) *  (J(0,0)-J(1,1)) +  (J(1,0)+J(0,1)) * (J(1,0)+J(0,1)); 
 }
 
 
