@@ -1,4 +1,5 @@
 #include "datageo.hpp"
+#include <iterator>
 #include <parameterization.hpp>
 #include <igl/boundary_loop.h>
 #include <igl/map_vertices_to_circle.h>
@@ -8,6 +9,7 @@
 #include <igl/adjacency_list.h>
 #include <igl/local_basis.h>
 #include <igl/grad.h>
+#include <igl/writeOBJ.h>
 #include <math.h>
 #include <Eigen/SparseLU>
 #include <intrinsicgrad.hpp>
@@ -91,6 +93,7 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
       fixed_UV_positions.resize(2,2);
       fixed_UV_indices << fixed1, fixed2;
       fixed_UV_positions << 1,0,0,1;
+      // std::cout << " fixed indices " << fixed_UV_indices << std::endl;
     }
     else if(type=='4'){
       // fix the first vertex
@@ -104,7 +107,7 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
     }
   }
 	
-	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions,V.rows(), C, d); 
+	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions, V.rows(), C, d); 
 }
 
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
@@ -351,8 +354,9 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
   return itr;
 }
 
-
 unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout){
+
+  
   Eigen::MatrixXd UV_init;
   
   reset_constraints();
@@ -411,6 +415,77 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
     fout << curr_energy << ",";
     ++itr;
+  }
+  return itr;
+}
+
+
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name){
+
+  
+  Eigen::MatrixXd UV_init;
+  
+  reset_constraints();
+  UV_init = tutte(data_mesh, false);
+  
+  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, false);
+  fout << past_energy << ",";
+
+  double tol = 1e-8;
+  
+  unsigned max_iterations = intrinsic_maxitr;
+  unsigned itr = 0;
+  unsigned total_iterations;
+  // first with extrinsic geometry
+  auto start = std::chrono::high_resolution_clock::now();
+  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, false);
+  auto end = std::chrono::high_resolution_clock::now();
+  
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  fout << total_iterations << "," << duration << ",";  
+
+  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
+  fout << curr_energy << ",";
+
+
+  while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
+    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl; 
+    // intrinsic flipping
+    unsigned flips, del_flips;
+    unsigned total_flips = 0;
+    unsigned total_del_flips = 0;
+
+    start = std::chrono::high_resolution_clock::now();
+    while(flips = edgeorder_flip(data_mesh, UV, del_flips, EnergyType::ARAP)){
+      total_flips += flips;
+      total_del_flips += del_flips;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    fout << total_flips << "," << total_del_flips << "," << duration << ",";
+    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ","; 
+
+    // compute parameterization with new intrinsic geometry
+    Eigen::MatrixXd new_UV;
+
+    start = std::chrono::high_resolution_clock::now();
+    total_iterations = ARAP_tillconverges(data_mesh, UV, new_UV, ARAP_maxitr ,isFreeBoundary, true);
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    fout << total_iterations << "," << duration << ",";
+
+    UV = new_UV;
+    past_energy = curr_energy;
+    curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
+    fout << curr_energy << ",";
+    ++itr;
+    Eigen::MatrixXd CN;
+    Eigen::MatrixXi FN;
+    std::string to_store = path + "/" + mesh_name + "_" + std::to_string(itr);
+    to_store += ".obj";
+    igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV, data_mesh.F);
   }
   return itr;
 }
@@ -520,6 +595,54 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
   return itr;
 }
 
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name){
+
+  auto start = std::chrono::high_resolution_clock::now();
+  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, false);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  double past_energy = 0;
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, false);
+  fout << duration << "," << curr_energy << ",";
+  double tol = 1e-8;
+  unsigned itr = 0;
+  UV = UV_init;
+  while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
+    unsigned flips, del;
+    unsigned total_flips = 0;
+    unsigned total_del_flips = 0;
+    start = std::chrono::high_resolution_clock::now();
+    while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::ASAP)){
+      total_flips+=flips; 
+      total_del_flips+=del;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    fout << total_flips << "," << total_del_flips << "," << duration << ",";
+    fout << compute_total_energy(data_mesh, UV, EnergyType::ASAP, true) << ",";
+
+    start = std::chrono::high_resolution_clock::now();
+    UV = LSCM(data_mesh, isFreeBoundary, true);
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    past_energy = curr_energy;
+    curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ASAP, true);
+    fout << duration << "," << curr_energy << ",";
+    ++itr;
+    Eigen::MatrixXd CN;
+    Eigen::MatrixXi FN;
+    std::string to_store = path + "/" + mesh_name + "_" + std::to_string(itr);
+    to_store += ".obj";
+    igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV, data_mesh.F);
+
+  }
+  return itr;
+}
+
+
 Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
@@ -574,6 +697,54 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   return UV;
 }
 
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout, std::string path, std::string mesh_name){
+  auto start = std::chrono::high_resolution_clock::now();
+  Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  double past_energy = 0;
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, false);
+  fout << duration << "," << curr_energy << ",";
+  double tol = 1e-8;
+  unsigned itr = 0;
+  UV = UV_init;
+  while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
+    unsigned flips, del;
+    unsigned total_flips = 0;
+    unsigned total_del_flips = 0;
+    start = std::chrono::high_resolution_clock::now();
+    while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::DIRICHLET)){
+      total_flips+=flips; 
+      total_del_flips+=del;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    fout << total_flips << "," << total_del_flips << "," << duration << ",";
+    fout << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << ",";
+
+    
+    start = std::chrono::high_resolution_clock::now();
+    UV = harmonic(data_mesh, true); 
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    past_energy = curr_energy;
+    curr_energy = compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true);
+    fout << duration << "," << curr_energy << ","; 
+    ++itr;
+    
+    Eigen::MatrixXd CN;
+    Eigen::MatrixXi FN;
+    std::string to_store = path + "/" + mesh_name + "_" + std::to_string(itr);
+    to_store += ".obj";
+    igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV, data_mesh.F);
+
+  }
+
+  return itr;
+}
+
 unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout){
   auto start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
@@ -614,6 +785,7 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
 
   return itr;
 }
+
 
 
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
@@ -704,6 +876,32 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   
 }
 
+double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  
+  data_mesh.intTri->requireFaceIndices();
+  double (*energy)(Eigen::Matrix2d);
+
+  if(et == EnergyType::DIRICHLET) energy = dirichlet;
+  if(et == EnergyType::ASAP) energy = asap;
+  if(et == EnergyType::ARAP) energy = arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
+
+  double total_energy = 0;
+  double total_area = 0;
+  for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
+    size_t idx = data_mesh.intTri->faceIndices[f];
+    Eigen::Matrix2d J;
+    faceJacobian(data_mesh, UV, f, J);
+    double curr_area = data_mesh.intTri->faceArea(f);
+    if(idx == 13227) std::cout << "idx " << idx << ":  " << curr_area << std::endl;
+    total_area += curr_area; 
+    total_energy += curr_area * energy(J);
+  }
+  return total_energy/total_area;
+
+}
+
+// only used for ARAP, that's why ASAP UV_area normalization is not implemented
 double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et){
   
@@ -730,7 +928,7 @@ double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, 
   return total_energy/areas.sum();
 }
 
-
+// USE THIS FOR COMPUTING TOTAL ENERGY
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad){
   
   double (*energy)(Eigen::Matrix2d);
@@ -739,15 +937,20 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
   if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
-  Eigen::VectorXd areas;
+  Eigen::VectorXd areas, areas_UV;
   Eigen::SparseMatrix<double> Dx, Dy;
   if(igrad){
     computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
+    Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+    igl::doublearea(UV, F_new, areas_UV);
+    areas_UV/=2;
   }
   else{
     computeSurfaceGradientMatrix(data_mesh.V, data_mesh.F, Dx, Dy);
     igl::doublearea(data_mesh.V, data_mesh.F, areas);
     areas/=2;
+    igl::doublearea(UV, data_mesh.F, areas_UV);
+    areas_UV/=2;
   }
 
   Eigen::VectorXd Dxu = Dx * UV.col(0);		
@@ -778,7 +981,11 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
       std::cout << " Nan found in Jacobian: " << J << std::endl;
     total_energy += energy(J)*areas(i);
   }
-  return total_energy/areas.sum();
+//  std::cout << "area sum: " << areas.sum() << std::endl;
+
+  double return_energy = total_energy/areas.sum();
+  if(et == EnergyType::ASAP) return_energy = return_energy / areas_UV.sum();
+  return return_energy;
 }
 
 double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et){
