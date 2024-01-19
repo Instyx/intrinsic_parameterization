@@ -19,13 +19,14 @@ void computeSurfaceGradientMatrix(const Eigen::MatrixXd &V, const Eigen::MatrixX
 }
 
 
-void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx, 
+void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx,
     Eigen::SparseMatrix<double> & Dy, Eigen::VectorXd &areas){
   data_mesh.intTri->requireFaceIndices();
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
- 
+
   Eigen::SparseMatrix<double>G;
+  Eigen::SparseMatrix<double>OG;
   unsigned nfaces = data_mesh.intTri->intrinsicMesh->nFaces();
   unsigned nvertices = data_mesh.intTri->intrinsicMesh->nVertices();
   areas.resize(nfaces);
@@ -35,42 +36,26 @@ void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx,
   Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
   for(gcs::Face face : data_mesh.intTri->intrinsicMesh->faces()){
     size_t idx = data_mesh.intTri->faceIndices[face];
-    size_t v0 = F_new(idx,0); 
-    size_t v1 = F_new(idx,1); 
-    size_t v2 = F_new(idx,2); 
+    uint e_iter = 0;
     for(gcs::Edge e : face.adjacentEdges()){
       std::array<gcs::Vertex, 2> verts = e.adjacentVertices();
-      if(data_mesh.intTri->vertexIndices[verts[0]]==v0){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v1){ // v0 - v1
-          lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v0 - v2
-          lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-        }
+      lengths(idx, (e_iter+2)%3) = data_mesh.intTri->edgeLengths[e];
+      // can be removed for efficiency if we trust geometry central.
+      if (!(
+        (F_new(idx, e_iter) == verts[0].getIndex() && F_new(idx, (e_iter+1)%3) == verts[1].getIndex()) ||
+        (F_new(idx, e_iter) == verts[1].getIndex() && F_new(idx, (e_iter+1)%3) == verts[0].getIndex()))
+      ) {
+        // This should never happen:
+        std::cout << "This should never happen: Order fucked in triangle " << idx << "\n";
       }
-      else if(data_mesh.intTri->vertexIndices[verts[0]]==v1){
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v1 - v0
-          lengths(idx, 2) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v1 - v2
-          lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-        }
-      }
-      else{
-        if(data_mesh.intTri->vertexIndices[verts[1]]==v0){ // v2 - v0
-          lengths(idx, 1) = data_mesh.intTri->edgeLengths[e];
-        }
-        else{ // v2 - v1
-          lengths(idx, 0) = data_mesh.intTri->edgeLengths[e];
-        }
-      }
+      e_iter++;
     }
     areas(idx) = data_mesh.intTri->faceArea(face);
   }
+  // igl::grad(data_mesh.intTri->inputGeom->vertexPositions, data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>(), OG);
   igl::grad_intrinsic(lengths, F_new, G);
   Dx.resize(nfaces, nvertices);
   Dy.resize(nfaces, nvertices);
   Dx=G.block(0, 0, nfaces, nvertices);
   Dy=G.block(nfaces, 0, nfaces, nvertices);
 }
-
