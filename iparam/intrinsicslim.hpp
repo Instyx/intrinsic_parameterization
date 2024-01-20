@@ -14,3 +14,6 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
 
 unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr,
     unsigned intrinsic_maxitr, std::fstream &fout);
+
+// this also saves the inbetween mesh with textures
+unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr, unsigned intrinsic_maxitr, std::fstream &fout, std::string path, std::string mesh_name);
