@@ -233,13 +233,13 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
     reset=true;
     computeParameterization(data_mesh, V, F, UV, new_UV, freeBoundary, igrad, key);
     UV = new_UV;
-    // cout << "energy sadf: " << compute_total_energy(data_mesh, UV, et, true) << endl;
-    cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
+    cout << "energy sadf: " << compute_total_energy(data_mesh, UV, et, true) << endl;
+    // cout << "energy: " << compute_energy_ext(V, F, UV, et) << endl;
     if(F_o.size()!=0){
       computeParameterization(data_mesh, V, F_o, UV_o, new_UV, freeBoundary, igrad, key);
       UV_o = new_UV;
-      //cout << "energy F_new: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
-      cout << "energy F_new: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
+      cout << "energy F_new: " << compute_total_energy(data_mesh, UV_o, et, true) << endl;
+      //cout << "energy F_new: " << compute_energy_ext(V, F_o, UV_o, et) << endl;
     }
 		break;
   }
@@ -376,6 +376,9 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   }
   case '6': {
     //test_ARAP();
+    Eigen::MatrixXd UV_init = tutte(data_mesh, true);
+    std::fstream foutt;
+    intrinsicslim(data_mesh, UV_init, UV, 1000, 50, foutt);
     break;
   }
 
@@ -601,7 +604,7 @@ void print_usage(){
 int main(int argc,char *argv[]) {
   // evaluation
   if(argc != 2) {
-    test_all();
+    test_all_withtextures();
     return 0;
   }
 

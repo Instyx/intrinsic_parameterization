@@ -360,10 +360,14 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   Eigen::MatrixXd UV_init;
 
   reset_constraints();
-  UV_init = tutte(data_mesh, false);
-  
-  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, false);
-  fout << past_energy << ",";
+
+  auto start = std::chrono::high_resolution_clock::now();
+  UV_init = tutte(data_mesh, true);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, true);
+  fout << duration << "," <<past_energy << ",";
 
   double tol = 1e-8;
 
@@ -371,15 +375,15 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   unsigned itr = 0;
   unsigned total_iterations;
   // first with extrinsic geometry
-  auto start = std::chrono::high_resolution_clock::now();
-  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, false);
-  auto end = std::chrono::high_resolution_clock::now();
+  start = std::chrono::high_resolution_clock::now();
+  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, true);
+  end = std::chrono::high_resolution_clock::now();
 
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   fout << total_iterations << "," << duration << ",";
 
-  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
+  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
   fout << curr_energy << ",";
 
 
@@ -426,9 +430,9 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   Eigen::MatrixXd UV_init;
 
   reset_constraints();
-  UV_init = tutte(data_mesh, false);
+  UV_init = tutte(data_mesh, true);
 
-  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, false);
+  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, true);
   fout << past_energy << ",";
 
   double tol = 1e-8;
@@ -438,14 +442,14 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   unsigned total_iterations;
   // first with extrinsic geometry
   auto start = std::chrono::high_resolution_clock::now();
-  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, false);
+  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, true);
   auto end = std::chrono::high_resolution_clock::now();
 
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   fout << total_iterations << "," << duration << ",";
 
-  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
+  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
   fout << curr_energy << ",";
 
 
@@ -557,12 +561,12 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
 unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout){
 
   auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, false);
+  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, true);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   double past_energy = 0;
-  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, false);
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, true);
   fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
@@ -598,12 +602,12 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
 unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
 
   auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, false);
+  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, true);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   double past_energy = 0;
-  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, false);
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, true);
   fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
@@ -699,12 +703,12 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
 
 unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name){
   auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
+  Eigen::MatrixXd UV_init = harmonic(data_mesh, true);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   double past_energy = 0;
-  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, false);
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, true);
   fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
@@ -747,12 +751,12 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
 
 unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout){
   auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
+  Eigen::MatrixXd UV_init = harmonic(data_mesh, true);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   double past_energy = 0;
-  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, false);
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, true);
   fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
@@ -981,10 +985,10 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
       std::cout << " Nan found in Jacobian: " << J << std::endl;
     total_energy += energy(J)*areas(i);
   }
-//  std::cout << "area sum: " << areas.sum() << std::endl;
+ // std::cout << "area sum: " << areas_UV << std::endl;
 
   double return_energy = total_energy/areas.sum();
-  if(et == EnergyType::ASAP) return_energy = return_energy / areas_UV.sum();
+  if(et == EnergyType::ASAP) return_energy = std::abs(return_energy / areas_UV.sum());
   return return_energy;
 }
 
