@@ -28,10 +28,12 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad);
 
-double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
+//double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
 
 double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et);
+
+double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
 
 // boundary constraints are stored as static variables, for the purpose of testing this resets the static variables
 void reset_constraints();
@@ -49,5 +51,15 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad);
 
 unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout);
 
+
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
+
+// these also saves inbetween meshes with textures 
+
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name);
+
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout, std::string path, std::string mesh_name);
+
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name);
+
 
