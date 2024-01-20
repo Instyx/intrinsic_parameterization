@@ -43,11 +43,11 @@ DataGeo compareIDTvsGreedy(DataGeo &data_mesh){
   computeParameterization(data_mesh, data_mesh.V, data_mesh.F, UV, new_UV, false, true, '2');
   UV = new_UV;
   std::cout << "Intrinsic Energy: " << std::endl;
-  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, true) << 
-    " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << std::endl; 
+  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, true) <<
+    " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << std::endl;
 
   std::cout << "Extrinsic Energy: " << std::endl;
-  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, false) << 
+  std::cout << "  IDT energy: " << compute_total_energy(data_mesh_idt, UV_idt, EnergyType::DIRICHLET, false) <<
     " ;  Greedy energy: " << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, false) << std::endl;
   return data_mesh_idt;
 }
@@ -60,18 +60,18 @@ unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay){
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     if(e.isBoundary()) continue;
     if(onlyDelaunay && data_mesh.intTri->isDelaunay(e)) continue;
-    
+
     double edge_len_b = data_mesh.intTri->edgeLengths[e];
     data_mesh.intTri->flipEdgeIfPossible(e);
     double edge_len = data_mesh.intTri->edgeLengths[e];
 
-   // std::cout << edge_len << "   " << edge_len_b << std::endl; 
+   // std::cout << edge_len << "   " << edge_len_b << std::endl;
 
-    size_t v1 = data_mesh.intTri->vertexIndices[e.firstVertex()]; 
+    size_t v1 = data_mesh.intTri->vertexIndices[e.firstVertex()];
     size_t v2 = data_mesh.intTri->vertexIndices[e.secondVertex()];
     Eigen::RowVector3d vec = V.row(v1) - V.row(v2);
     double vec_norm = vec.norm();
-   
+
     // flip back if not coplanar
     if(std::abs(vec_norm-edge_len)>tolarence) data_mesh.intTri->flipEdgeIfPossible(e);
     else total_flips++;
@@ -112,8 +112,8 @@ void compareIDTvsIPARAM(DataGeo &data_mesh, bool isFreeBoundary, const EnergyTyp
   }
 }
 */
-void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
-  
+void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name, bool isFreeBoundary, std::ostream &fout){
+
   //IPARAM
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
@@ -152,7 +152,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ","; 
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ",";
   fout << total_iterations <<  "," << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ARAP , false) << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -160,7 +160,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_
   fout << "\n";
 
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -184,8 +184,8 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ","; 
+
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ",";
   fout << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -194,13 +194,13 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_
 
 }
 
-void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
-  size_t lastindex = mesh_name.find_last_of("."); 
+void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, bool isFreeBoundary, std::ostream &fout){
+  size_t lastindex = mesh_name.find_last_of(".");
   std::string mesh_name_wo_extension =  mesh_name.substr(0, lastindex);
 
   Eigen::MatrixXd CN;
   Eigen::MatrixXi FN;
-  std::string to_store_dir = dir + "/" + mesh_name_wo_extension; 
+  std::string to_store_dir = dir + "/" + mesh_name_wo_extension;
   std::filesystem::create_directory(to_store_dir);
   to_store_dir += "/arap";
   std::filesystem::create_directory(to_store_dir);
@@ -247,7 +247,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ","; 
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ",";
   fout << total_iterations <<  "," << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::ARAP , false) << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -257,7 +257,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -281,21 +281,21 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ","; 
+
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ",";
   fout << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
   }
   fout << "\n";
-  
+
   str = to_store_dir + "/" + mesh_name_wo_extension + "_idt" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_int, F);
 
 }
 
 
-void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name,  std::fstream &fout){
+void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string mesh_name,  std::ostream &fout){
 
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
@@ -332,13 +332,13 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string 
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::DIRICHLET , false) << ","; 
+  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::DIRICHLET , false) << ",";
   for(int i = 0; i<302; ++i){
     fout << -1 << ",";
   }
   fout << "\n";
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -359,7 +359,7 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string 
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
+
   fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::DIRICHLET, true) << ",";
   for(int i = 0; i<302;++i){
     fout << -1 << ",";
@@ -368,9 +368,9 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F,  std::string 
 
 }
 
-void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name,  std::fstream &fout){
+void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name,  std::ostream &fout){
 
-  size_t lastindex = mesh_name.find_last_of("."); 
+  size_t lastindex = mesh_name.find_last_of(".");
   std::string mesh_name_wo_extension =  mesh_name.substr(0, lastindex);
 
   Eigen::MatrixXd CN;
@@ -420,16 +420,16 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::DIRICHLET , false) << ","; 
+  fout << duration << "," << compute_total_energy(data_mesh, UV_ext, EnergyType::DIRICHLET , false) << ",";
   for(int i = 0; i<302; ++i){
     fout << -1 << ",";
   }
   fout << "\n";
-  
+
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -450,7 +450,7 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
+
   fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::DIRICHLET, true) << ",";
   for(int i = 0; i<302;++i){
     fout << -1 << ",";
@@ -464,9 +464,9 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
 
 
 
-void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, bool isFreeBoundary, std::ostream &fout){
 
-  
+
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
 
@@ -508,7 +508,7 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_n
   }
   fout << "\n";
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -529,7 +529,7 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_n
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
+
   fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ASAP, true) << ",";
   for(int i = 0; i<302;++i){
     fout << -1 << ",";
@@ -538,9 +538,9 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_n
 
 }
 
-void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, bool isFreeBoundary, std::fstream &fout){
+void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, bool isFreeBoundary, std::ostream &fout){
 
-  size_t lastindex = mesh_name.find_last_of("."); 
+  size_t lastindex = mesh_name.find_last_of(".");
   std::string mesh_name_wo_extension =  mesh_name.substr(0, lastindex);
 
   Eigen::MatrixXd CN;
@@ -601,7 +601,7 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -622,7 +622,7 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
+
   fout << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ASAP, true) << ",";
   for(int i = 0; i<302;++i){
     fout << -1 << ",";
@@ -635,8 +635,8 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
 }
 
 
-void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, std::fstream &fout){
-  
+void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, std::ostream &fout){
+
   //IPARAM
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
@@ -656,7 +656,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
 
   Eigen::MatrixXd UV_iparam;
   Eigen::MatrixXd UV_iparam_init = tutte(data_mesh, false);
-  
+
   unsigned total_iterations = intrinsicslim(data_mesh, UV_iparam_init, UV_iparam, 1000, 50, fout);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -679,7 +679,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::SYMMETRIC_DIRICHLET , false) << ","; 
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::SYMMETRIC_DIRICHLET , false) << ",";
   fout << total_iterations <<  "," << duration << "," << slimdata_ext.energy/2 << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -687,7 +687,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   fout << "\n";
 
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -712,8 +712,8 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ","; 
+
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ",";
   fout << total_iterations << "," << duration << "," << slimdata_idt.energy/2 << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -722,9 +722,9 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
 
 }
 
-void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, std::fstream &fout){
-  
-  size_t lastindex = mesh_name.find_last_of("."); 
+void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, std::string mesh_name, std::ostream &fout){
+
+  size_t lastindex = mesh_name.find_last_of(".");
   std::string mesh_name_wo_extension =  mesh_name.substr(0, lastindex);
 
   Eigen::MatrixXd CN;
@@ -755,7 +755,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
 
   Eigen::MatrixXd UV_iparam;
   Eigen::MatrixXd UV_iparam_init = tutte(data_mesh, false);
-  
+
   unsigned total_iterations = intrinsicslim(data_mesh, UV_iparam_init, UV_iparam, 1000, 50, fout, to_store_dir_all, mesh_name_wo_extension);
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -781,7 +781,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::SYMMETRIC_DIRICHLET , false) << ","; 
+  fout << compute_total_energy(data_mesh, UV_ext_init, EnergyType::SYMMETRIC_DIRICHLET , false) << ",";
   fout << total_iterations <<  "," << duration << "," << slimdata_ext.energy/2 << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -792,7 +792,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
 
-  // IDT 
+  // IDT
   std::cout << "------------ IDT -------------- " <<std::endl;
   fout << mesh_name << "," << "idt" << ",";
   start = std::chrono::high_resolution_clock::now();
@@ -817,8 +817,8 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ","; 
+
+  fout << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ",";
   fout << total_iterations << "," << duration << "," << slimdata_idt.energy/2 << ",";
   for(int i = 0; i<352;++i){
     fout << -1 << ",";
@@ -909,5 +909,3 @@ void test_all_withtextures(){
   // Close the directory
   closedir(directory);
 }
-
-

@@ -20,10 +20,10 @@
 #include <chrono>
 
 
-// global variables for the boundary conditions 
+// global variables for the boundary conditions
 Eigen::SparseMatrix<double> C;
 Eigen::VectorXd d;
-  
+
 void reset_constraints(){
   C.resize(0,0);
   d.resize(0);
@@ -47,12 +47,12 @@ Eigen::SparseMatrix<double> compute_L_uniform(const Eigen::MatrixXd &V, const Ei
 
 
 void ConvertConstraintsToMatrixForm(Eigen::VectorXi indices, Eigen::MatrixXd positions, unsigned nvertices, Eigen::SparseMatrix<double> &C, Eigen::VectorXd &d) {
-	
+
 	// u coordinates
   std::vector<Eigen::Triplet<double> > list;
 	d = Eigen::VectorXd::Zero(2*indices.size());
 	for (int i = 0; i < indices.size(); ++i) {
-		list.push_back(Eigen::Triplet<double>(i,indices(i),1)); 
+		list.push_back(Eigen::Triplet<double>(i,indices(i),1));
 		d(i) = positions(i,0);
 	}
 	// v coordinates
@@ -69,7 +69,7 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
   Eigen::VectorXi fixed_UV_indices;
   Eigen::MatrixXd fixed_UV_positions;
   if (!isFreeBoundary) {
-    // the boundary is fixed to unit circle 
+    // the boundary is fixed to unit circle
     igl::boundary_loop(F, fixed_UV_indices);
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
   }
@@ -106,8 +106,8 @@ void computeConstraints(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, bool
       std::cout << "Free boudnary not possible" << std::endl;
     }
   }
-	
-	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions, V.rows(), C, d); 
+
+	ConvertConstraintsToMatrixForm(fixed_UV_indices, fixed_UV_positions, V.rows(), C, d);
 }
 
 void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, Eigen::MatrixXd &UV, Eigen::MatrixXd &new_UV,
@@ -143,7 +143,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
   // Harmonic - cotangent Laplacian
 	if (type == '2') {
 		//A = (L 0)
-		//    (0 L)  
+		//    (0 L)
     Eigen::SparseMatrix<double> L;
     if(igrad){
       data_mesh.intTri->requireCotanLaplacian();
@@ -154,11 +154,11 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
     std::vector<Eigen::Triplet<double> > tlist;
 		for (int i = 0; i < L.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
-				tlist.push_back(Eigen::Triplet<double>(it.row(), it.col(), -it.value())); // - comes from the warning above 
+				tlist.push_back(Eigen::Triplet<double>(it.row(), it.col(), -it.value())); // - comes from the warning above
 				tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), -it.value()));
 			}
 		}
-		A.setFromTriplets(tlist.begin(), tlist.end());		
+		A.setFromTriplets(tlist.begin(), tlist.end());
 		b = Eigen::VectorXd::Zero(2*V.rows());
 
 	}
@@ -174,11 +174,11 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 	  	igl::doublearea(V,F,areas);
       areas/=2;
     }
-		
+
 		// A = (DxADx + DyADy  -DxADy + DyADx)
 		//     (DxADy - DyADx   DxADx + DyADy)
-    Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-    Eigen::SparseMatrix<double> B2 = -Dx.transpose()*areas.asDiagonal()*Dy + Dy.transpose()*areas.asDiagonal()*Dx; 
+    Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy;
+    Eigen::SparseMatrix<double> B2 = -Dx.transpose()*areas.asDiagonal()*Dy + Dy.transpose()*areas.asDiagonal()*Dx;
     std::vector<Eigen::Triplet<double> > tlist;
 		for (int i = 0; i < B1.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
@@ -186,13 +186,13 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 				tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), it.value()));
 			}
 		}
-  
+
 		for (int i = 0; i < B2.outerSize(); ++i) {
 			for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(B2,i); it; ++it) {
 				tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col(), it.value()));
 				tlist.push_back(Eigen::Triplet<double>(it.row(), it.col()+V.rows(), -it.value()));
 			}
-		}		
+		}
 		A.setFromTriplets(tlist.begin(), tlist.end());
 		b = Eigen::VectorXd::Zero(2*V.rows());
 	}
@@ -209,9 +209,9 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 		  areas/=2;
     }
 		// to compute the SVD from the previous iteration
-    Eigen::VectorXd Dxu = Dx * UV.col(0);		
-    Eigen::VectorXd Dxv = Dx * UV.col(1);		
-    Eigen::VectorXd Dyu = Dy * UV.col(0);		
+    Eigen::VectorXd Dxu = Dx * UV.col(0);
+    Eigen::VectorXd Dxv = Dx * UV.col(1);
+    Eigen::VectorXd Dyu = Dy * UV.col(0);
     Eigen::VectorXd Dyv = Dy * UV.col(1);
     Eigen::MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix
     int flipped_triangles = 0;
@@ -226,11 +226,11 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 			RR(i,1) = R(0,1);
 			RR(i,2) = R(1,0);
 			RR(i,3) = R(1,1);
-		}		
+		}
 		b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
 		Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
 
-    Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
+    Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy;
 
     std::vector<Eigen::Triplet<double> > tlist;
 		for (int i = 0; i < B1.outerSize(); ++i) {
@@ -245,7 +245,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
 	// build (A C^t; C 0)
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
-  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows());
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
 	igl::cat(2, C, zeros, temp2);
@@ -276,7 +276,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
 
 	A.resize(2*V.rows(),2*V.rows());
 	b.resize(2*V.rows());
-  
+
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
   if(igrad){
@@ -288,7 +288,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
     areas/=2;
   }
 
-  Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
+  Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy;
 
   std::vector<Eigen::Triplet<double> > tlist;
   for (int i = 0; i < B1.outerSize(); ++i) {
@@ -300,7 +300,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
   A.setFromTriplets(tlist.begin(), tlist.end());
 
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
-  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows());
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
 	igl::cat(2, C, zeros, temp2);
@@ -319,9 +319,9 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
   unsigned itr = 0;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     // to compute the SVD from the previous iteration
-    Eigen::VectorXd Dxu = Dx * UV.col(0);		
-    Eigen::VectorXd Dxv = Dx * UV.col(1);		
-    Eigen::VectorXd Dyu = Dy * UV.col(0);		
+    Eigen::VectorXd Dxu = Dx * UV.col(0);
+    Eigen::VectorXd Dxv = Dx * UV.col(1);
+    Eigen::VectorXd Dyu = Dy * UV.col(0);
     Eigen::VectorXd Dyv = Dy * UV.col(1);
     Eigen::MatrixXd RR(F.rows(),4); // each row is the flattened closest rotation matrix
     // local step
@@ -334,10 +334,10 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
       RR(i,1) = R(0,1);
       RR(i,2) = R(1,0);
       RR(i,3) = R(1,1);
-    }		
+    }
     b << Dx.transpose() * (areas.asDiagonal() * RR.col(0)) + Dy.transpose() * (areas.asDiagonal() * RR.col(1)),
     Dx.transpose() * (areas.asDiagonal() * RR.col(2)) + Dy.transpose() * (areas.asDiagonal() * RR.col(3));
-   
+
     //global step
     Eigen::VectorXd rhs(2*V.rows()+C.rows());
   	rhs << b,d;
@@ -354,11 +354,11 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
   return itr;
 }
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout){
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout){
 
-  
+
   Eigen::MatrixXd UV_init;
-  
+
   reset_constraints();
   UV_init = tutte(data_mesh, false);
   
@@ -366,7 +366,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   fout << past_energy << ",";
 
   double tol = 1e-8;
-  
+
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
   unsigned total_iterations;
@@ -374,17 +374,17 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   auto start = std::chrono::high_resolution_clock::now();
   total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, false);
   auto end = std::chrono::high_resolution_clock::now();
-  
+
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << total_iterations << "," << duration << ",";  
+
+  fout << total_iterations << "," << duration << ",";
 
   double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
   fout << curr_energy << ",";
 
 
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
-    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl; 
+    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl;
     // intrinsic flipping
     unsigned flips, del_flips;
     unsigned total_flips = 0;
@@ -398,7 +398,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
-    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ","; 
+    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ",";
 
     // compute parameterization with new intrinsic geometry
     Eigen::MatrixXd new_UV;
@@ -407,7 +407,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     total_iterations = ARAP_tillconverges(data_mesh, UV, new_UV, ARAP_maxitr ,isFreeBoundary, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    
+
     fout << total_iterations << "," << duration << ",";
 
     UV = new_UV;
@@ -420,19 +420,19 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
 }
 
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name){
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
 
-  
+
   Eigen::MatrixXd UV_init;
-  
+
   reset_constraints();
   UV_init = tutte(data_mesh, false);
-  
+
   double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, false);
   fout << past_energy << ",";
 
   double tol = 1e-8;
-  
+
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
   unsigned total_iterations;
@@ -440,17 +440,17 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
   auto start = std::chrono::high_resolution_clock::now();
   total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, false);
   auto end = std::chrono::high_resolution_clock::now();
-  
+
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  fout << total_iterations << "," << duration << ",";  
+
+  fout << total_iterations << "," << duration << ",";
 
   double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, false);
   fout << curr_energy << ",";
 
 
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
-    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl; 
+    //std::cout << "Intrinsic itr. " << itr << ":" << std::endl;
     // intrinsic flipping
     unsigned flips, del_flips;
     unsigned total_flips = 0;
@@ -464,7 +464,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
-    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ","; 
+    fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ",";
 
     // compute parameterization with new intrinsic geometry
     Eigen::MatrixXd new_UV;
@@ -473,7 +473,7 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     total_iterations = ARAP_tillconverges(data_mesh, UV, new_UV, ARAP_maxitr ,isFreeBoundary, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    
+
     fout << total_iterations << "," << duration << ",";
 
     UV = new_UV;
@@ -501,7 +501,7 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
 
 	A.resize(2*V.rows(),2*V.rows());
 	b.resize(2*V.rows());
-  
+
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
   if(igrad){
@@ -513,8 +513,8 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
     areas/=2;
   }
 
-  Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy; 
-  Eigen::SparseMatrix<double> B2 = -Dx.transpose()*areas.asDiagonal()*Dy + Dy.transpose()*areas.asDiagonal()*Dx; 
+  Eigen::SparseMatrix<double> B1 = Dx.transpose()*areas.asDiagonal()*Dx + Dy.transpose()*areas.asDiagonal()*Dy;
+  Eigen::SparseMatrix<double> B2 = -Dx.transpose()*areas.asDiagonal()*Dy + Dy.transpose()*areas.asDiagonal()*Dx;
   std::vector<Eigen::Triplet<double> > tlist;
   for (int i = 0; i < B1.outerSize(); ++i) {
     for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(B1,i); it; ++it) {
@@ -528,12 +528,12 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
       tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col(), it.value()));
       tlist.push_back(Eigen::Triplet<double>(it.row(), it.col()+V.rows(), -it.value()));
     }
-  }		
+  }
   A.setFromTriplets(tlist.begin(), tlist.end());
   b = Eigen::VectorXd::Zero(2*V.rows());
 
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
-  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows());
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
 	igl::cat(2, C, zeros, temp2);
@@ -554,7 +554,7 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
   return UV;
 }
 
-unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::fstream &fout){
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout){
 
   auto start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, false);
@@ -573,7 +573,7 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
     unsigned total_del_flips = 0;
     start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::ASAP)){
-      total_flips+=flips; 
+      total_flips+=flips;
       total_del_flips+=del;
     }
     end = std::chrono::high_resolution_clock::now();
@@ -595,7 +595,7 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
   return itr;
 }
 
-unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::fstream &fout, std::string path, std::string mesh_name){
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
 
   auto start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, false);
@@ -614,7 +614,7 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
     unsigned total_del_flips = 0;
     start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::ASAP)){
-      total_flips+=flips; 
+      total_flips+=flips;
       total_del_flips+=del;
     }
     end = std::chrono::high_resolution_clock::now();
@@ -646,15 +646,15 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
 Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
-  
+
   computeConstraints(V, F, false, '2', C, d);
- 
+
   Eigen::SparseMatrix<double> A;
   Eigen::VectorXd b;
 
 	A.resize(2*V.rows(),2*V.rows());
 	b.resize(2*V.rows());
-  
+
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
 
@@ -668,15 +668,15 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   std::vector<Eigen::Triplet<double> > tlist;
   for (int i = 0; i < L.outerSize(); ++i) {
     for (Eigen::SparseMatrix<double,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
-      tlist.push_back(Eigen::Triplet<double>(it.row(), it.col(), -it.value())); // - comes from the warning above 
+      tlist.push_back(Eigen::Triplet<double>(it.row(), it.col(), -it.value())); // - comes from the warning above
       tlist.push_back(Eigen::Triplet<double>(it.row()+V.rows(), it.col()+V.rows(), -it.value()));
     }
   }
-  A.setFromTriplets(tlist.begin(), tlist.end());		
+  A.setFromTriplets(tlist.begin(), tlist.end());
   b = Eigen::VectorXd::Zero(2*V.rows());
 
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
-  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows());
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
 	igl::cat(2, C, zeros, temp2);
@@ -697,7 +697,7 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   return UV;
 }
 
-unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout, std::string path, std::string mesh_name){
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name){
   auto start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
   auto end = std::chrono::high_resolution_clock::now();
@@ -715,7 +715,7 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
     unsigned total_del_flips = 0;
     start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::DIRICHLET)){
-      total_flips+=flips; 
+      total_flips+=flips;
       total_del_flips+=del;
     }
     end = std::chrono::high_resolution_clock::now();
@@ -723,17 +723,17 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << ",";
 
-    
+
     start = std::chrono::high_resolution_clock::now();
-    UV = harmonic(data_mesh, true); 
+    UV = harmonic(data_mesh, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     past_energy = curr_energy;
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true);
-    fout << duration << "," << curr_energy << ","; 
+    fout << duration << "," << curr_energy << ",";
     ++itr;
-    
+
     Eigen::MatrixXd CN;
     Eigen::MatrixXi FN;
     std::string to_store = path + "/" + mesh_name + "_" + std::to_string(itr);
@@ -745,7 +745,7 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
   return itr;
 }
 
-unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::fstream &fout){
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout){
   auto start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_init = harmonic(data_mesh, false);
   auto end = std::chrono::high_resolution_clock::now();
@@ -763,7 +763,7 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
     unsigned total_del_flips = 0;
     start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::DIRICHLET)){
-      total_flips+=flips; 
+      total_flips+=flips;
       total_del_flips+=del;
     }
     end = std::chrono::high_resolution_clock::now();
@@ -771,15 +771,15 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << ",";
 
-    
+
     start = std::chrono::high_resolution_clock::now();
-    UV = harmonic(data_mesh, true); 
+    UV = harmonic(data_mesh, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     past_energy = curr_energy;
     curr_energy = compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true);
-    fout << duration << "," << curr_energy << ","; 
+    fout << duration << "," << curr_energy << ",";
     ++itr;
   }
 
@@ -791,9 +791,9 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
-  
+
   computeConstraints(V, F, false, '1', C, d);
- 
+
   Eigen::SparseMatrix<double> A;
   Eigen::VectorXd b;
 
@@ -801,7 +801,7 @@ Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
 	b.resize(2*V.rows());
 
   Eigen::SparseMatrix<double> L;
-  
+
   if(igrad){
     Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
     L = compute_L_uniform(V, F_new);
@@ -819,7 +819,7 @@ Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
   b = Eigen::VectorXd::Zero(2*V.rows());
 
   Eigen::SparseMatrix<double> Ct, temp1, temp2, res;
-  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows()); 
+  Eigen::SparseMatrix<double> zeros(C.rows(), C.rows());
 	Ct = C.transpose();
 	igl::cat(2, A, Ct, temp1);
 	igl::cat(2, C, zeros, temp2);
@@ -852,17 +852,17 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
     if(i==3) break; // assumed triangle faces
     halfedges[i]=he;
     ++i;
-  } 
- 
+  }
+
   // flattening the intrinsic triangle using edge lengths
   double fi_len1 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
   double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
   double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
 
   Eigen::Matrix2d E, E_tilde;
-  double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1); 
-  E_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp); 
- 
+  double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1);
+  E_tilde << fi_len1, temp, 0 , sqrt(fi_len3*fi_len3 - temp*temp);
+
   // computing the Jacobian
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
@@ -873,11 +873,11 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   E_tilde_inverse << E_tilde(1,1), -E_tilde(0,1), -E_tilde(1,0), E_tilde(0,0);
   E_tilde_inverse = E_tilde_inverse/E_tilde.determinant();
   J = E * E_tilde.inverse();
-  
+
 }
 
 double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
-  
+
   data_mesh.intTri->requireFaceIndices();
   double (*energy)(Eigen::Matrix2d);
 
@@ -894,7 +894,7 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
     faceJacobian(data_mesh, UV, f, J);
     double curr_area = data_mesh.intTri->faceArea(f);
     if(idx == 13227) std::cout << "idx " << idx << ":  " << curr_area << std::endl;
-    total_area += curr_area; 
+    total_area += curr_area;
     total_energy += curr_area * energy(J);
   }
   return total_energy/total_area;
@@ -904,17 +904,17 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
 // only used for ARAP, that's why ASAP UV_area normalization is not implemented
 double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et){
-  
+
   double (*energy)(Eigen::Matrix2d);
 
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
   if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
-    
-  Eigen::VectorXd Dxu = Dx * UV.col(0);		
-  Eigen::VectorXd Dxv = Dx * UV.col(1);		
-  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+
+  Eigen::VectorXd Dxu = Dx * UV.col(0);
+  Eigen::VectorXd Dxv = Dx * UV.col(1);
+  Eigen::VectorXd Dyu = Dy * UV.col(0);
   Eigen::VectorXd Dyv = Dy * UV.col(1);
   double total_energy = 0;
   for(int i=0;i<data_mesh.intTri->intrinsicMesh->nFaces();++i){
@@ -930,7 +930,7 @@ double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, 
 
 // USE THIS FOR COMPUTING TOTAL ENERGY
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad){
-  
+
   double (*energy)(Eigen::Matrix2d);
 
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
@@ -953,9 +953,9 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
     areas_UV/=2;
   }
 
-  Eigen::VectorXd Dxu = Dx * UV.col(0);		
-  Eigen::VectorXd Dxv = Dx * UV.col(1);		
-  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+  Eigen::VectorXd Dxu = Dx * UV.col(0);
+  Eigen::VectorXd Dxv = Dx * UV.col(1);
+  Eigen::VectorXd Dyu = Dy * UV.col(0);
   Eigen::VectorXd Dyv = Dy * UV.col(1);
 /*
   bool hasNaN = false;
@@ -1003,10 +1003,10 @@ double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, co
   computeSurfaceGradientMatrix(V, F, Dx, Dy);
   igl::doublearea(V, F, areas);
 	areas/=2;
-  
-  Eigen::VectorXd Dxu = Dx * UV.col(0);		
-  Eigen::VectorXd Dxv = Dx * UV.col(1);		
-  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+
+  Eigen::VectorXd Dxu = Dx * UV.col(0);
+  Eigen::VectorXd Dxv = Dx * UV.col(1);
+  Eigen::VectorXd Dyu = Dy * UV.col(0);
   Eigen::VectorXd Dyv = Dy * UV.col(1);
 
   double total_energy = 0;
@@ -1020,4 +1020,3 @@ double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, co
   return total_energy/areas.sum();
 
 }
-

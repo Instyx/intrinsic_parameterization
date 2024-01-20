@@ -7,16 +7,16 @@
 #include <igl/writeOBJ.h>
 
 double compute_symdir_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
-  
+
   auto energy = symmetric_dirichlet;
   Eigen::SparseMatrix<double> Dx, Dy;
   Eigen::VectorXd areas;
-  
+
   computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
 
-  Eigen::VectorXd Dxu = Dx * UV.col(0);		
-  Eigen::VectorXd Dxv = Dx * UV.col(1);		
-  Eigen::VectorXd Dyu = Dy * UV.col(0);		
+  Eigen::VectorXd Dxu = Dx * UV.col(0);
+  Eigen::VectorXd Dxv = Dx * UV.col(1);
+  Eigen::VectorXd Dyu = Dy * UV.col(0);
   Eigen::VectorXd Dyv = Dy * UV.col(1);
 
   double total_energy = 0;
@@ -30,7 +30,7 @@ double compute_symdir_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
     }
     double locen = energy(J)*areas(i);
     total_area+=areas(i);
-    total_energy += locen; 
+    total_energy += locen;
   }
   return total_energy/total_area;
 }
@@ -43,11 +43,11 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
     igl::slim_precompute(V, F, UV_init, slimdata, igl::MappingEnergyType::SYMMETRIC_DIRICHLET,
         fixed_UV_indices, fixed_UV_positions, 0);
-    //std::cout << "Initial energy: " << slimdata.energy << 
+    //std::cout << "Initial energy: " << slimdata.energy <<
     //  "; intri en: " << compute_symdir_energy(data_mesh, UV_init)  << std::endl;
     if(igrad){
       Eigen::VectorXd areas;
-      Eigen::SparseMatrix<double> Dx, Dy; 
+      Eigen::SparseMatrix<double> Dx, Dy;
       computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
 
       slimdata.Dx = Dx;
@@ -55,7 +55,7 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
       slimdata.mesh_area = areas.sum();
       slimdata.M = areas*2; // in igl::slim this was the way
       slimdata.F = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
-      //std::cout << "slim energy: " << slimdata.energy << 
+      //std::cout << "slim energy: " << slimdata.energy <<
       //  "; intri en: " << compute_symdir_energy(data_mesh, new_UV)  << std::endl;
       slimdata.energy = compute_symdir_energy(data_mesh, UV_init) * 2;
     }
@@ -63,7 +63,7 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
   }
 
   double tol = 1e-8;
-  double past_energy = 0; 
+  double past_energy = 0;
   double curr_energy = slimdata.energy;
   unsigned itr = 0;
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
@@ -78,13 +78,13 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
 
 
 
-unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr, unsigned intrinsic_maxitr, std::fstream &fout){
+unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr, unsigned intrinsic_maxitr, std::ostream &fout){
   igl::SLIMData slimdata;
 
   Eigen::VectorXd areas;
-  Eigen::SparseMatrix<double> Dx, Dy; 
-  Eigen::MatrixXd V = data_mesh.V; 
-  Eigen::MatrixXi F = data_mesh.F; 
+  Eigen::SparseMatrix<double> Dx, Dy;
+  Eigen::MatrixXd V = data_mesh.V;
+  Eigen::MatrixXi F = data_mesh.F;
   auto flip_func = edgeorder_flip;
   auto start = std::chrono::high_resolution_clock::now();
   if(!slimdata.has_pre_calc){
@@ -94,7 +94,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
     igl::slim_precompute(V, F, UV_init, slimdata, igl::MappingEnergyType::SYMMETRIC_DIRICHLET,
         fixed_UV_indices, fixed_UV_positions, 0);
-    //std::cout << "Initial energy: " << slimdata.energy << 
+    //std::cout << "Initial energy: " << slimdata.energy <<
     //  "; intri en: " << compute_symdir_energy(data_mesh, UV_init)  << std::endl;
   }
 
@@ -108,7 +108,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   double past_energy =  compute_symdir_energy(data_mesh, UV_init)*2;
   double tol = 1e-8;
   unsigned max_iterations = intrinsic_maxitr;
-  unsigned itr = 0; 
+  unsigned itr = 0;
 
   // dividing by 2 because double_area usage in igl::slim
   fout << past_energy/2 << "," << total_iterations << "," << duration << "," << curr_energy/2 << ",";
@@ -116,7 +116,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
 
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     UV = slimdata.V_o;
-    
+
     //intrinsic flipping
     unsigned flips, del;
     unsigned total_flips = 0;
@@ -126,12 +126,12 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     while(flips=flip_func(data_mesh, UV, del, EnergyType::SYMMETRIC_DIRICHLET)){
         total_flips+=flips;
         total_del_flips+=del;
-    } 
+    }
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
-    fout << compute_symdir_energy(data_mesh, UV) << ","; 
+    fout << compute_symdir_energy(data_mesh, UV) << ",";
 
     start = std::chrono::high_resolution_clock::now();
     computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
@@ -156,13 +156,13 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
 }
 
 
-unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr, unsigned intrinsic_maxitr, std::fstream &fout, std::string path, std::string mesh_name){
+unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned slim_maxitr, unsigned intrinsic_maxitr, std::ostream &fout, std::string path, std::string mesh_name){
   igl::SLIMData slimdata;
 
   Eigen::VectorXd areas;
-  Eigen::SparseMatrix<double> Dx, Dy; 
-  Eigen::MatrixXd V = data_mesh.V; 
-  Eigen::MatrixXi F = data_mesh.F; 
+  Eigen::SparseMatrix<double> Dx, Dy;
+  Eigen::MatrixXd V = data_mesh.V;
+  Eigen::MatrixXi F = data_mesh.F;
   auto flip_func = edgeorder_flip;
   auto start = std::chrono::high_resolution_clock::now();
   if(!slimdata.has_pre_calc){
@@ -172,7 +172,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     igl::map_vertices_to_circle(V, fixed_UV_indices, fixed_UV_positions);
     igl::slim_precompute(V, F, UV_init, slimdata, igl::MappingEnergyType::SYMMETRIC_DIRICHLET,
         fixed_UV_indices, fixed_UV_positions, 0);
-    //std::cout << "Initial energy: " << slimdata.energy << 
+    //std::cout << "Initial energy: " << slimdata.energy <<
     //  "; intri en: " << compute_symdir_energy(data_mesh, UV_init)  << std::endl;
   }
 
@@ -186,7 +186,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   double past_energy =  compute_symdir_energy(data_mesh, UV_init)*2;
   double tol = 1e-8;
   unsigned max_iterations = intrinsic_maxitr;
-  unsigned itr = 0; 
+  unsigned itr = 0;
 
   // dividing by 2 because double_area usage in igl::slim
   fout << past_energy/2 << "," << total_iterations << "," << duration << "," << curr_energy/2 << ",";
@@ -194,7 +194,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
 
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     UV = slimdata.V_o;
-    
+
     //intrinsic flipping
     unsigned flips, del;
     unsigned total_flips = 0;
@@ -204,12 +204,12 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     while(flips=flip_func(data_mesh, UV, del, EnergyType::SYMMETRIC_DIRICHLET)){
         total_flips+=flips;
         total_del_flips+=del;
-    } 
+    }
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
-    fout << compute_symdir_energy(data_mesh, UV) << ","; 
+    fout << compute_symdir_energy(data_mesh, UV) << ",";
 
     start = std::chrono::high_resolution_clock::now();
     computeGrad_intrinsic(data_mesh, Dx, Dy, areas);
@@ -238,5 +238,3 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   UV = slimdata.V_o;
   return itr;
 }
-
-
