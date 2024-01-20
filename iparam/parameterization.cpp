@@ -257,7 +257,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 	solver.analyzePattern(res);
 	solver.factorize(res);
 	Eigen::VectorXd x = solver.solve(rhs);
-  std::cout << " solver " << solver.info() << std::endl;
+  // std::cout << " solver " << solver.info() << std::endl;
 	new_UV.resize(V.rows(),2);
 	new_UV.col(0) = x.segment(0,V.rows());
  	new_UV.col(1) = x.segment(V.rows(),V.rows());
@@ -342,7 +342,7 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
     Eigen::VectorXd rhs(2*V.rows()+C.rows());
   	rhs << b,d;
     Eigen::VectorXd x = solver.solve(rhs);
-    std::cout << " solver " << solver.info() << std::endl;
+    // std::cout << " solver " << solver.info() << std::endl;
 	  UV.col(0) = x.segment(0,V.rows());
  	  UV.col(1) = x.segment(V.rows(),V.rows());
 
@@ -549,7 +549,7 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
 	solver.analyzePattern(res);
 	solver.factorize(res);
 	Eigen::VectorXd x = solver.solve(rhs);
-  std::cout << " solver " << solver.info() << std::endl;
+  // std::cout << " solver " << solver.info() << std::endl;
 
   Eigen::MatrixXd UV;
 	UV.resize(V.rows(),2);
@@ -692,7 +692,7 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
 	solver.analyzePattern(res);
 	solver.factorize(res);
 	Eigen::VectorXd x = solver.solve(rhs);
-  std::cout << " solver " << solver.info() << std::endl;
+  // std::cout << " solver " << solver.info() << std::endl;
 
   Eigen::MatrixXd UV;
 	UV.resize(V.rows(),2);
@@ -835,7 +835,7 @@ Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
 	solver.analyzePattern(res);
 	solver.factorize(res);
 	Eigen::VectorXd x = solver.solve(rhs);
-  std::cout << " solver " << solver.info() << std::endl;
+  // std::cout << " solver " << solver.info() << std::endl;
 
   Eigen::MatrixXd UV;
 	UV.resize(V.rows(),2);
