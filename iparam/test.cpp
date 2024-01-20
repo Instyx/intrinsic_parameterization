@@ -9,6 +9,8 @@
 #include <dirent.h>
 #include <intrinsicslim.hpp>
 #include <filesystem>
+#include "store_intrinsic_mesh.hpp"
+
 // to check if deluanay flips always decrease the energy
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
@@ -245,7 +247,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   fout << duration << "," << compute_total_energy(data_mesh, UV_ext_init, EnergyType::ARAP , false) << ",";
-  
+
   start = std::chrono::high_resolution_clock::now();
   total_iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, 1000, isFreeBoundary, false);
 
@@ -280,7 +282,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   end = std::chrono::high_resolution_clock::now();
   auto duration_idt = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  
+
   start = std::chrono::high_resolution_clock::now();
   Eigen::MatrixXd UV_int;
   Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
@@ -294,6 +296,9 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
 
   end = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  store_intrinsic_edges(data_mesh, mesh_name_wo_extension);
+  store_intrinsic_mesh(data_mesh, mesh_name_wo_extension);
 
   fout  << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
   for(int i = 0; i<351;++i){
@@ -499,9 +504,9 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
   std::filesystem::create_directory(to_store_dir_all);
 
   Eigen::MatrixXd UV_iparam_idt;
-  
+
   total_iterations = intrinsic_harmonic(data_mesh_idt, UV_iparam_idt, 50, fout, to_store_dir_all, mesh_name_wo_extension);
-  fout << total_iterations << "," <<  duration_idt << ","; 
+  fout << total_iterations << "," <<  duration_idt << ",";
   for(int i=total_iterations*7;i<300;++i){
     fout << -1 << ",";
   }
