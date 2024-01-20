@@ -10,6 +10,7 @@
 #include <intrinsicslim.hpp>
 #include <filesystem>
 #include "store_intrinsic_mesh.hpp"
+#include "read_mesh.hpp"
 
 // to check if deluanay flips always decrease the energy
 bool isDelaunayFlipBad(DataGeo &data_mesh, const Eigen::MatrixXd &UV){
@@ -748,7 +749,7 @@ void test_all(){
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     DataGeo data_mesh, data_mesh_idt;
-    igl::read_triangle_mesh(filePath,V,F);
+    read_mesh(filePath,V,F);
     test_ARAP_single(V, F, std::string(entry->d_name), true, fout_arap);
     test_Dirichlet_single(V, F, std::string(entry->d_name), fout_dirichlet);
     test_ASAP_single(V, F, std::string(entry->d_name), true, fout_asap);
@@ -763,7 +764,7 @@ void test_all(){
 }
 
 void test_all_withtextures(){
-  const char* folderPath = "../test_data";
+  const char* folderPath = "../meshes";
   DIR* directory = opendir(folderPath);
   if (directory == NULL) {
     std::cerr << "Failed to open directory." << std::endl;
@@ -787,7 +788,7 @@ void test_all_withtextures(){
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     DataGeo data_mesh, data_mesh_idt;
-    igl::read_triangle_mesh(filePath,V,F);
+    read_mesh(filePath,V,F);
     test_ARAP_single(V, F, folderPath, std::string(entry->d_name), true, fout_arap);
     test_Dirichlet_single(V, F, folderPath, std::string(entry->d_name),  fout_dirichlet);
     test_ASAP_single(V, F, folderPath, std::string(entry->d_name), true, fout_asap);
