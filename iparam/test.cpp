@@ -823,7 +823,6 @@ void test_all_withtextures(){
     Eigen::MatrixXi F;
     DataGeo data_mesh, data_mesh_idt;
     read_mesh(filePath,V,F);
-    std::cout << "running mesh " << filePath << std::endl;
     std::cout << "   ARAP    " << std::endl;
     test_ARAP_single(V, F, folderPath, std::string(entry->d_name), true, fout_arap);
     std::cout << "   DIRICHLET   " << std::endl;
