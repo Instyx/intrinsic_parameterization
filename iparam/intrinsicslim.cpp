@@ -72,7 +72,7 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
     past_energy = curr_energy;
     curr_energy = slimdata.energy;
     ++itr;
-    std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
+     //std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
   }
   return itr;
 }
@@ -144,7 +144,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     past_energy = curr_energy;
     curr_energy = slimdata.energy;
     ++itr;
-    std::cout << "Itr " << itr << ": " << curr_energy << std::endl; 
+    // std::cout << "Itr " << itr << ": " << curr_energy << std::endl; 
   }
   UV = slimdata.V_o;
   return itr;
@@ -172,7 +172,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   }
 
   // first extrinsic
-  unsigned total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV_init, slim_maxitr, false);
+  unsigned total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV_init, slim_maxitr, true);
 
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
