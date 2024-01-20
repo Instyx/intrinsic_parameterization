@@ -250,7 +250,7 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
-  
+
   //IPARAM
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
@@ -264,10 +264,17 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   fout << "\n";
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
-  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
 
-  
+  try {
+    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
+  try {
+    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
 }
 
 
@@ -407,10 +414,18 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
 
-  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  try {
+    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
+  try {
+    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
 
-  
+
 }
 
 
@@ -535,11 +550,11 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
 
-  
+
   std::cout << "------------ IPARAM -------------- " <<std::endl;
   fout << mesh_name << "," << "iparam" << ",";
 
-  
+
   Eigen::MatrixXd UV_iparam;
 
   unsigned total_iterations = intrinsic_LSCM(data_mesh, UV_ext, UV_iparam, 50, true, fout, to_store_dir_all, mesh_name_wo_extension);
@@ -552,9 +567,17 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
 
-  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  
+  try {
+    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
+  try {
+    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
+
 }
 
 
@@ -658,7 +681,7 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   std::filesystem::create_directory(to_store_dir);
   std::string to_store_dir_all = to_store_dir + "/inbetween";
   std::filesystem::create_directory(to_store_dir_all);
-  
+
   auto start = std::chrono::high_resolution_clock::now();
 
   DataGeo data_mesh;
@@ -719,9 +742,17 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
 
- 
-  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+
+  try {
+    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
+  try {
+    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  } catch (...) {
+    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  }
 
 }
 
@@ -792,6 +823,7 @@ void test_all_withtextures(){
     Eigen::MatrixXi F;
     DataGeo data_mesh, data_mesh_idt;
     read_mesh(filePath,V,F);
+    std::cout << "running mesh " << filePath << std::endl;
     std::cout << "   ARAP    " << std::endl;
     test_ARAP_single(V, F, folderPath, std::string(entry->d_name), true, fout_arap);
     std::cout << "   DIRICHLET   " << std::endl;
