@@ -3,6 +3,7 @@
 #include <iostream>
 #include "read_mesh.hpp"
 #include "test.hpp"
+#include <filesystem>
 
 int main(int argc, char *argv[]) {
   // evaluation
@@ -21,10 +22,10 @@ int main(int argc, char *argv[]) {
   DataGeo data_mesh;
   read_mesh(std::string(argv[2]),V,F);
   std::fstream log;
-
-  size_t lastindex = mesh_name.find_last_of(".");
-  std::string mesh_name_wo_extension =  mesh_name.substr(0, lastindex);
-  std::string to_store_dir = dir + "/" + mesh_name_wo_extension;
+  std::string filename = std::string(argv[2]).substr(std::string(argv[2]).find_last_of("/\\") + 1);
+  size_t lastindex = filename.find_last_of(".");
+  std::string mesh_name_wo_extension =  filename.substr(0, lastindex);
+  std::string to_store_dir = std::string(argv[3]) + "/" + mesh_name_wo_extension;
   std::filesystem::create_directory(to_store_dir);
 
   // opens an existing csv file or creates a new file.
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
   if (std::string(argv[1]) == "Dirichlet"){
 
   } else if (std::string(argv[1]) == "ARAP"){
-    test_ARAP_single(V, F, std::string(argv[3]), std::string(argv[2]).substr(std::string(argv[2]).find_last_of("/\\") + 1), true, log);
+    test_ARAP_single(V, F, std::string(argv[3]), filename, true, log);
   } else if (std::string(argv[1]) == "Conformal"){
 
   } else if (std::string(argv[1]) == "SymDirichlet"){
