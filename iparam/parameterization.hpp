@@ -28,7 +28,7 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
 
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad);
 
-//double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
+double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et);
 
 double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et);
