@@ -236,6 +236,8 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   fout << "\n";
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
+  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
 
   //extrinsic
   std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
@@ -262,69 +264,6 @@ void test_ARAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
-
-  // IDT
-  std::cout << "------------ IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "idt" << ",";
-  start = std::chrono::high_resolution_clock::now();
-
-  DataGeo data_mesh_idt;
-  data_mesh_idt.V = V;
-  data_mesh_idt.F = F;
-  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
-  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
-  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
-  data_mesh_idt.intTri->requireEdgeLengths();
-  data_mesh_idt.intTri->requireVertexIndices();
-  data_mesh_idt.intTri->requireFaceAreas();
-
-  data_mesh_idt.intTri->flipToDelaunay();
-  end = std::chrono::high_resolution_clock::now();
-  auto duration_idt = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-
-  start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_int;
-  Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << duration_idt << "," << duration << "," << compute_total_energy(data_mesh, UV_int_init, EnergyType::ARAP , true) << ",";
-
-  start = std::chrono::high_resolution_clock::now();
-  total_iterations = ARAP_tillconverges(data_mesh_idt, UV_int_init, UV_int, 1000, isFreeBoundary, true);
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  store_intrinsic_edges(data_mesh, mesh_name_wo_extension);
-  store_intrinsic_mesh(data_mesh, mesh_name_wo_extension);
-
-  fout  << total_iterations << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ARAP , true) << ",";
-  for(int i = 0; i<351;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_int, F);
-
-
-  //IDT_IPARAM
-  std::cout << "------------ IPARAM_IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "iparam_idt" << ",";
-  to_store_dir_all = to_store_dir + "/inbetween_idt";
-  std::filesystem::create_directory(to_store_dir_all);
-
-  Eigen::MatrixXd UV_iparam_idt;
-  total_iterations = intrinsic_ARAP(data_mesh_idt, UV_iparam_idt, 1000, 50, isFreeBoundary, fout, to_store_dir_all, mesh_name_wo_extension);
-  fout << total_iterations << "," << duration_idt << ","; // this is init duration
-  for(int i=total_iterations*7;i<350;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_iparam_idt, F);
 
 }
 
@@ -445,6 +384,9 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
 
+  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+
   //extrinsic
   std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
   fout << mesh_name << "," << "ext" << ",";
@@ -462,58 +404,6 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
-
-  // IDT
-  std::cout << "------------ IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "idt" << ",";
-  start = std::chrono::high_resolution_clock::now();
-
-  DataGeo data_mesh_idt;
-  data_mesh_idt.V = V;
-  data_mesh_idt.F = F;
-  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
-  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
-  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
-  data_mesh_idt.intTri->requireEdgeLengths();
-  data_mesh_idt.intTri->requireVertexIndices();
-  data_mesh_idt.intTri->requireFaceAreas();
-
-  data_mesh_idt.intTri->flipToDelaunay();
-  end = std::chrono::high_resolution_clock::now();
-  auto duration_idt = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_int = harmonic(data_mesh_idt, true);
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << duration_idt << "," << duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::DIRICHLET, true) << ",";
-  for(int i = 0; i<301;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_int, F);
-
-  //IDT_IPARAM
-  std::cout << "------------ IPARAM_IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "iparam_idt" << ",";
-  to_store_dir_all = to_store_dir + "/inbetween_idt";
-  std::filesystem::create_directory(to_store_dir_all);
-
-  Eigen::MatrixXd UV_iparam_idt;
-
-  total_iterations = intrinsic_harmonic(data_mesh_idt, UV_iparam_idt, 50, fout, to_store_dir_all, mesh_name_wo_extension);
-  fout << total_iterations << "," <<  duration_idt << ",";
-  for(int i=total_iterations*7;i<300;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_iparam_idt, F);
 
 }
 
@@ -637,6 +527,9 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
 
+  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+
   //extrinsic
   std::cout << "------------ EXTRINSIC -------------- " <<std::endl;
   fout << mesh_name << "," << "ext" << ",";
@@ -655,58 +548,6 @@ void test_ASAP_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string dir, s
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
-
-  // IDT
-  std::cout << "------------ IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "idt" << ",";
-  start = std::chrono::high_resolution_clock::now();
-
-  DataGeo data_mesh_idt;
-  data_mesh_idt.V = V;
-  data_mesh_idt.F = F;
-  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
-  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
-  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
-  data_mesh_idt.intTri->requireEdgeLengths();
-  data_mesh_idt.intTri->requireVertexIndices();
-  data_mesh_idt.intTri->requireFaceAreas();
-
-  data_mesh_idt.intTri->flipToDelaunay();
-  end = std::chrono::high_resolution_clock::now();
-  auto duration_idt = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_int = LSCM(data_mesh_idt, isFreeBoundary, true);
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << duration_idt << "," <<duration << "," << compute_total_energy(data_mesh_idt, UV_int, EnergyType::ASAP, true) << ",";
-  for(int i = 0; i<301;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_int, F);
-
-  //IDT_IPARAM
-  std::cout << "------------ IPARAM_IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "iparam_idt" << ",";
-  to_store_dir_all = to_store_dir + "/inbetween_idt";
-  std::filesystem::create_directory(to_store_dir_all);
-
-  Eigen::MatrixXd UV_iparam_idt;
-
-  total_iterations = intrinsic_LSCM(data_mesh_idt, UV_iparam_idt, 50, true, fout, to_store_dir_all, mesh_name_wo_extension);
-  fout << total_iterations << "," << duration_idt << ","; // this is init duration
-  for(int i=total_iterations*7;i<300;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_iparam_idt, F);
 
 }
 
@@ -876,67 +717,8 @@ void test_SymDirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::strin
   str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
-
-  // IDT
-  std::cout << "------------ IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "idt" << ",";
-  start = std::chrono::high_resolution_clock::now();
-
-  DataGeo data_mesh_idt;
-  igl::SLIMData slimdata_idt;
-  data_mesh_idt.V = V;
-  data_mesh_idt.F = F;
-  data_mesh_idt.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh_idt.F));
-  data_mesh_idt.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh_idt.inputMesh, data_mesh_idt.V));
-  data_mesh_idt.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh_idt.inputMesh, *data_mesh_idt.inputGeometry));
-  data_mesh_idt.intTri->requireEdgeLengths();
-  data_mesh_idt.intTri->requireVertexIndices();
-  data_mesh_idt.intTri->requireFaceAreas();
-
-  data_mesh_idt.intTri->flipToDelaunay();
-  end = std::chrono::high_resolution_clock::now();
-  auto duration_idt = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_int;
-  Eigen::MatrixXd UV_int_init = tutte(data_mesh_idt, true);
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << duration_idt << "," << duration << "," << compute_total_energy(data_mesh, UV_int_init, EnergyType::SYMMETRIC_DIRICHLET , true) << ",";
-
-  start = std::chrono::high_resolution_clock::now();
-  total_iterations = slim_tillconverges(data_mesh_idt, slimdata_idt, V, F, UV_int_init, 1000, true);
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << total_iterations << "," << duration << "," << slimdata_idt.energy/2 << ",";
-  for(int i = 0; i<351;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_int" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_int, F);
-
-  //IDT_IPARAM
-  std::cout << "------------ IPARAM_IDT -------------- " <<std::endl;
-  fout << mesh_name << "," << "iparam_idt" << ",";
-  to_store_dir_all = to_store_dir + "/inbetween_idt";
-  std::filesystem::create_directory(to_store_dir_all);
-
-  Eigen::MatrixXd UV_iparam_idt;
-  total_iterations = intrinsicslim(data_mesh_idt, UV_int_init, UV_iparam_idt, 1000, 50, fout, to_store_dir_all, mesh_name_wo_extension);
-  fout << total_iterations << "," <<  duration_idt << ","; // this is init duration
-  for(int i=total_iterations*7;i<350;++i){
-    fout << -1 << ",";
-  }
-  fout << "\n";
-
-  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam_idt" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_iparam_idt, F);
-
+  store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
 
 }
 

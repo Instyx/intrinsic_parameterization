@@ -72,7 +72,7 @@ unsigned slim_tillconverges(DataGeo &data_mesh, igl::SLIMData& slimdata, const E
     past_energy = curr_energy;
     curr_energy = slimdata.energy;
     ++itr;
-     //std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
+   // std::cout << " Energy itr. " << itr << " : " << curr_energy << std::endl;
   }
   return itr;
 }
@@ -144,7 +144,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     past_energy = curr_energy;
     curr_energy = slimdata.energy;
     ++itr;
-    // std::cout << "Itr " << itr << ": " << curr_energy << std::endl; 
+    std::cout << "Intrinsic Itr " << itr << ": " << curr_energy << std::endl; 
   }
   UV = slimdata.V_o;
   return itr;

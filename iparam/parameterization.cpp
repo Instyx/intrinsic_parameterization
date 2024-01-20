@@ -888,7 +888,7 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
 
   double total_energy = 0;
   double total_area = 0;
@@ -914,7 +914,7 @@ double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, 
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
 
   Eigen::VectorXd Dxu = Dx * UV.col(0);
   Eigen::VectorXd Dxv = Dx * UV.col(1);
@@ -940,7 +940,7 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
   Eigen::VectorXd areas, areas_UV;
   Eigen::SparseMatrix<double> Dx, Dy;
   if(igrad){
@@ -999,7 +999,7 @@ double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, co
   if(et == EnergyType::DIRICHLET) energy = dirichlet;
   if(et == EnergyType::ASAP) energy = asap;
   if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet_alt;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
 
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;

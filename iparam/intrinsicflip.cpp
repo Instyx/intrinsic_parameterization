@@ -4,8 +4,37 @@
 #include <algorithm>
 #include <math.h>
 
+extern "C" {
+void exactinit(void);
+double orient2d(const double *pa, const double *pb, const double *pc);
+}
+// helper to call Shewchuk predicate with eigen types transparently
+double orient2d(const Eigen::Vector2d &pa,
+                const Eigen::Vector2d &pb,
+                const Eigen::Vector2d &pc)
+{
+    return orient2d(pa.data(),pb.data(),pc.data());
+}
+
 double cross2d(Eigen::Vector2d &v1, Eigen::Vector2d &v2){
   return v1(0)*v2(1)-v1(1)*v2(0);
+}
+
+
+bool isConcave_robust(std::vector<Eigen::Vector2d>& points){
+  Eigen::Vector2d p1 = points[0];
+  Eigen::Vector2d p2 = points[1];
+  Eigen::Vector2d p3 = points[2];
+  Eigen::Vector2d p4 = points[3];
+  double v1 = orient2d(p1, p2, p3); 
+  double v2 = orient2d(p2, p3, p4); 
+  double v3 = orient2d(p3, p4, p1); 
+  double v4 = orient2d(p4, p1, p2); 
+
+  if (v1 * v2 < 0 || v2 * v3 < 0 || v3 * v4 < 0) {
+    return true;
+  }
+  return false;
 }
 
 // the points are in order with the polygon rotation
@@ -66,7 +95,11 @@ bool diamondJacobians(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &
   //cout << "intri:   "<< data_mesh.inputGeometry->vertexPositions[v1] << ";  start mesh" << V.row(v1) << endl;
 
   // if concave the intrinsic flip is not possible
-  if(isConcave(points)) return false;
+  if(isConcave_robust(points)) return false;
+  // if one of the end vertices has degree smaller than 3, don't flip 
+  if(halfedges[1].tipVertex().degree()<=3 || halfedges[0].tailVertex().degree()<=3) return false;
+  // if flip causes self loop, don't flip
+  if(v3==v4) return false;
 
   E1 << UV(v2,0) - UV(v1,0), UV(v3,0) - UV(v1,0),
         UV(v2,1) - UV(v1,1), UV(v3,1) - UV(v1,1);
