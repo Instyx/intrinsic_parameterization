@@ -159,7 +159,6 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
   auto flip_func = edgeorder_flip;
-  auto start = std::chrono::high_resolution_clock::now();
   if(!slimdata.has_pre_calc){
     Eigen::MatrixXd fixed_UV_positions;
     Eigen::VectorXi fixed_UV_indices;
@@ -171,22 +170,12 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     //  "; intri en: " << compute_symdir_energy(data_mesh, UV_init)  << std::endl;
   }
 
-  // first extrinsic
-  unsigned total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV_init, slim_maxitr, true);
-
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
+  double past_energy =  0;
   double curr_energy =  slimdata.energy;
-  double past_energy =  compute_symdir_energy(data_mesh, UV_init)*2;
   double tol = 1e-8;
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
-
-  // dividing by 2 because double_area usage in igl::slim
-  fout << past_energy/2 << "," << total_iterations << "," << duration << "," << curr_energy/2 << ",";
-
-
+  
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     UV = slimdata.V_o;
 
@@ -195,20 +184,20 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     unsigned total_flips = 0;
     unsigned total_del_flips = 0;
 
-    start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     while(flips=flip_func(data_mesh, UV, del, EnergyType::SYMMETRIC_DIRICHLET)){
         total_flips+=flips;
         total_del_flips+=del;
     }
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_symdir_energy(data_mesh, UV) << ",";
 
     start = std::chrono::high_resolution_clock::now();
     
-    total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV, slim_maxitr, true);
+    unsigned total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV, slim_maxitr, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 

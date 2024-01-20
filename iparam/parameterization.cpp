@@ -424,34 +424,19 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
 }
 
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
 
 
-  Eigen::MatrixXd UV_init;
-
-  reset_constraints();
-  UV_init = tutte(data_mesh, true);
-
-  double past_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, true);
-  fout << past_energy << ",";
+  double past_energy = 0;
 
   double tol = 1e-8;
 
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
   unsigned total_iterations;
-  // first with extrinsic geometry
-  auto start = std::chrono::high_resolution_clock::now();
-  total_iterations = ARAP_tillconverges(data_mesh, UV_init, UV, ARAP_maxitr, isFreeBoundary, true);
-  auto end = std::chrono::high_resolution_clock::now();
-
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  fout << total_iterations << "," << duration << ",";
-
-  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, true);
-  fout << curr_energy << ",";
-
+ 
+  double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, true);
+  UV  = UV_init; 
 
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
     //std::cout << "Intrinsic itr. " << itr << ":" << std::endl;
@@ -460,13 +445,13 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_m
     unsigned total_flips = 0;
     unsigned total_del_flips = 0;
 
-    start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del_flips, EnergyType::ARAP)){
       total_flips += flips;
       total_del_flips += del_flips;
     }
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_total_energy(data_mesh, UV, EnergyType::ARAP, true) << ",";
 
@@ -599,16 +584,11 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
   return itr;
 }
 
-unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name){
 
-  auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = LSCM(data_mesh, isFreeBoundary, true);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   double past_energy = 0;
   double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ASAP, true);
-  fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
   UV = UV_init;
@@ -616,13 +596,13 @@ unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_it
     unsigned flips, del;
     unsigned total_flips = 0;
     unsigned total_del_flips = 0;
-    start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::ASAP)){
       total_flips+=flips;
       total_del_flips+=del;
     }
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_total_energy(data_mesh, UV, EnergyType::ASAP, true) << ",";
@@ -701,15 +681,9 @@ Eigen::MatrixXd harmonic(DataGeo &data_mesh, bool igrad){
   return UV;
 }
 
-unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name){
-  auto start = std::chrono::high_resolution_clock::now();
-  Eigen::MatrixXd UV_init = harmonic(data_mesh, true);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name){
   double past_energy = 0;
   double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::DIRICHLET, true);
-  fout << duration << "," << curr_energy << ",";
   double tol = 1e-8;
   unsigned itr = 0;
   UV = UV_init;
@@ -717,13 +691,13 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
     unsigned flips, del;
     unsigned total_flips = 0;
     unsigned total_del_flips = 0;
-    start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     while(flips = edgeorder_flip(data_mesh, UV, del, EnergyType::DIRICHLET)){
       total_flips+=flips;
       total_del_flips+=del;
     }
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_total_energy(data_mesh, UV, EnergyType::DIRICHLET, true) << ",";
 

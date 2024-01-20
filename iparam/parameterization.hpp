@@ -56,8 +56,8 @@ Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
 
 // these also saves inbetween meshes with textures
 
-unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name);
+unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name);
 
-unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name);
+unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, std::ostream &fout, std::string path, std::string mesh_name);
 
-unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name);
+unsigned intrinsic_LSCM(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, std::ostream &fout, std::string path, std::string mesh_name);
