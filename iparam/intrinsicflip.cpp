@@ -3,6 +3,8 @@
 #include <random>
 #include <algorithm>
 #include <math.h>
+#include <queue>
+#include <tuple>
 
 extern "C" {
 void exactinit(void);
@@ -296,6 +298,108 @@ unsigned random_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &de
     }
   }
   data_mesh.intTri->refreshQuantities();
+  return totalflips;
+}
+
+
+namespace std{
+    namespace
+    {
+        // Code from boost
+        // Reciprocal of the golden ratio helps spread entropy
+        //     and handles duplicates.
+        // See Mike Seymour in magic-numbers-in-boosthash-combine:
+        //     http://stackoverflow.com/questions/4948780
+        template <class T>
+        inline void hash_combine(std::size_t& seed, T const& v)
+        {
+            seed ^= std::hash<T>()(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+        }
+
+        // Recursive template code derived from Matthieu M.
+        template <class Tuple, size_t Index = std::tuple_size<Tuple>::value - 1>
+        struct HashValueImpl
+        {
+          static void apply(size_t& seed, Tuple const& tuple)
+          {
+            HashValueImpl<Tuple, Index-1>::apply(seed, tuple);
+            hash_combine(seed, std::get<Index>(tuple));
+          }
+        };
+
+        template <class Tuple>
+        struct HashValueImpl<Tuple,0>
+        {
+          static void apply(size_t& seed, Tuple const& tuple)
+          {
+            hash_combine(seed, std::get<0>(tuple));
+          }
+        };
+    }
+
+    template <typename ... TT>
+    struct hash<std::tuple<TT...>>
+    {
+        size_t
+        operator()(std::tuple<TT...> const& tt) const
+        {
+            size_t seed = 0;
+            HashValueImpl<std::tuple<TT...> >::apply(seed, tt);
+            return seed;
+        }
+
+    };
+}
+
+unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
+  if (delaunay_flips != 0) { // hack, as this method always finds all flips at once
+    return 0;
+  }
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireFaceAreas();
+  unsigned totalflips = 0;
+  delaunay_flips = 0;
+  std::unordered_map<std::tuple<int, int, int, int>, bool> checked_diamonds;
+  std::queue<gcs::Edge> q;
+  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+    q.push(e);
+  }
+  while (!q.empty()){
+    gcs::Edge e = q.front();q.pop();
+    if(e.isBoundary()) continue;
+    gcs::Face f1 = e.halfedge().face();
+    gcs::Face f2 = e.halfedge().twin().face();
+    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+    std::array<size_t, 4> quad = {halfedges[0].vertex().getIndex(), halfedges[1].vertex().getIndex(), halfedges[2].vertex().getIndex(), halfedges[3].vertex().getIndex()};
+    std::sort(quad.begin(), quad.end());
+    if (checked_diamonds.find(std::make_tuple(quad[0],quad[1],quad[2],quad[3])) != checked_diamonds.end()) continue;
+    else checked_diamonds[std::make_tuple(quad[0],quad[1],quad[2],quad[3])] = true;
+    Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
+    if(!diamondJacobians(data_mesh, UV, e, J1, J2)) continue;
+    double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
+                    energy(J2) * data_mesh.intTri->faceArea(f2);
+
+
+    if (!data_mesh.intTri->flipEdgeIfPossible(e)) continue;
+    gcs::Edge flipped = e;
+    diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
+    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+    if (before > after) {
+      std::cout << totalflips << std::endl;
+      totalflips++;
+      if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
+      for (size_t i = 0; i < 4; i++) {
+        q.push(halfedges[i].edge());
+      }
+    } else {
+      data_mesh.intTri->flipEdgeIfPossible(flipped);
+    }
+  }
   return totalflips;
 }
 
