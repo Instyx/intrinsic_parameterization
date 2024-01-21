@@ -263,9 +263,12 @@ void computeParameterization(DataGeo &data_mesh, const Eigen::MatrixXd &V, const
  	new_UV.col(1) = x.segment(V.rows(),V.rows());
 
 }
+unsigned ARAP_tillconverges(DataGeo &data_mesh, const Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad){
+  double d = -1;
+  return ARAP_tillconverges(data_mesh, UV_init, UV, max_iterations, isFreeBoundary, igrad, d);
+}
 
-
-unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad){
+unsigned ARAP_tillconverges(DataGeo &data_mesh, const Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad, double& curr_energy){
   Eigen::MatrixXd V = data_mesh.V;
   Eigen::MatrixXi F = data_mesh.F;
 
@@ -314,7 +317,9 @@ unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen:
 
   double tol = 1e-8;
   double past_energy = 0;
-  double curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, igrad);
+  if (curr_energy == -1) {
+    curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP, igrad);
+  }
   //std::cout << " Initial energy: " << curr_energy << std::endl;
   unsigned itr = 0;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
@@ -434,9 +439,9 @@ unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Mat
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
   unsigned total_iterations;
- 
+
   double curr_energy = compute_total_energy(data_mesh, UV_init, EnergyType::ARAP, true);
-  UV  = UV_init; 
+  UV  = UV_init;
 
   while(itr < max_iterations && std::abs(past_energy-curr_energy)>tol){
     //std::cout << "Intrinsic itr. " << itr << ":" << std::endl;

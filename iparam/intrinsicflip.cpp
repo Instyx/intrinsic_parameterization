@@ -352,9 +352,6 @@ namespace std{
 }
 
 unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
-  if (delaunay_flips != 0) { // hack, as this method always finds all flips at once
-    return 0;
-  }
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
   if(et==EnergyType::ASAP) energy = asap;
@@ -390,7 +387,6 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
     double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
     if (before > after) {
-      std::cout << totalflips << std::endl;
       totalflips++;
       if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
       for (size_t i = 0; i < 4; i++) {

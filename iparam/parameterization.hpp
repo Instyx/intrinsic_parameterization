@@ -39,7 +39,9 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
 void reset_constraints();
 
 
-unsigned ARAP_tillconverges(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad);
+unsigned ARAP_tillconverges(DataGeo &data_mesh, const Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad, double& curr_energy);
+
+unsigned ARAP_tillconverges(DataGeo &data_mesh, const Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad);
 
 unsigned intrinsic_ARAP(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ARAP_maxitr, unsigned intrinsic_maxitr, bool isFreeBoundary, std::ostream &fout);
 

@@ -135,7 +135,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     fout << compute_symdir_energy(data_mesh, UV) << ",";
 
     start = std::chrono::high_resolution_clock::now();
-    
+
     total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV, slim_maxitr, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -144,7 +144,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     past_energy = curr_energy;
     curr_energy = slimdata.energy;
     ++itr;
-    std::cout << "Intrinsic Itr " << itr << ": " << curr_energy << std::endl; 
+    std::cout << "Intrinsic Itr " << itr << ": " << curr_energy << std::endl;
   }
   UV = slimdata.V_o;
   return itr;
@@ -175,7 +175,7 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
   double tol = 1e-8;
   unsigned max_iterations = intrinsic_maxitr;
   unsigned itr = 0;
-  
+
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
     UV = slimdata.V_o;
 
@@ -195,8 +195,11 @@ unsigned intrinsicslim(DataGeo &data_mesh, Eigen::MatrixXd &UV_init, Eigen::Matr
     fout << total_flips << "," << total_del_flips << "," << duration << ",";
     fout << compute_symdir_energy(data_mesh, UV) << ",";
 
+    if (total_flips == 0) {
+      break;
+    }
+
     start = std::chrono::high_resolution_clock::now();
-    
     unsigned total_iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV, slim_maxitr, true);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
