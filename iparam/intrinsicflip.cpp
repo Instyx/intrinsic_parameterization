@@ -134,21 +134,21 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   }
   double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                   energy(J2) * data_mesh.intTri->faceArea(f2);
-  data_mesh.intTri->flipEdgeIfPossible(e);
+  if(!data_mesh.intTri->flipEdgeIfPossible(e)) return 0;
   gcs::Edge flipped = e;
 
   diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
 
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
 
-  double tolerance = 1e-6; // set tolerance to 1e-6
+  //double tolerance = 1e-6; // set tolerance to 1e-6
   data_mesh.intTri->flipEdgeIfPossible(flipped);
-  if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
-    return after - before;
-  }
-  else {
-    return 0;
-  }
+  //if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
+  return after - before;
+  //}
+  //else {
+   // return 0;
+  //}
 }
 
 unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
@@ -398,6 +398,62 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
   }
   return totalflips;
 }
+
+unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
+  auto energy = dirichlet;
+  if(et==EnergyType::DIRICHLET) energy = dirichlet;
+  if(et==EnergyType::ASAP) energy = asap;
+  if(et==EnergyType::ARAP) energy = arap;
+  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireFaceAreas();
+  unsigned totalflips = 0;
+  delaunay_flips = 0;
+  std::unordered_map<std::tuple<int, int, int, int>, bool> checked_diamonds;
+  std::priority_queue<std::pair<double, gcs::Edge> > q;
+  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+    if(e.isBoundary()) continue;
+    gcs::Face f1 = e.halfedge().face();
+    gcs::Face f2 = e.halfedge().twin().face();
+    Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
+    double energy_diff =  flippeddiff(data_mesh, UV, e, et);
+    if(energy_diff<0)
+      q.push(std::make_pair(energy_diff, e));
+  }
+  while (!q.empty()){
+    gcs::Edge e = q.top().second;
+    double energy_diff = q.top().first;
+    if(energy_diff>0) break; // there is no decreasing flip
+    q.pop();
+    if(e.isBoundary()) continue;
+    gcs::Face f1 = e.halfedge().face();
+    gcs::Face f2 = e.halfedge().twin().face();
+    std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+    std::array<size_t, 4> quad = {halfedges[0].vertex().getIndex(), halfedges[1].vertex().getIndex(), halfedges[2].vertex().getIndex(), halfedges[3].vertex().getIndex()};
+    std::sort(quad.begin(), quad.end());
+    if (checked_diamonds.find(std::make_tuple(quad[0],quad[1],quad[2],quad[3])) != checked_diamonds.end()) continue;
+    else checked_diamonds[std::make_tuple(quad[0],quad[1],quad[2],quad[3])] = true;
+    double actual_energy_diff = flippeddiff(data_mesh, UV, e, et);
+
+    // check if old value
+    if (actual_energy_diff > energy_diff) {
+      continue;
+    } else {
+      data_mesh.intTri->flipEdgeIfPossible(e);
+      totalflips++;
+      if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
+      for (size_t i = 0; i < 4; i++) {
+        gcs::Edge next_e = halfedges[i].edge(); 
+        double diff = flippeddiff(data_mesh, UV, e, et);
+        if(diff<0)
+          q.push(std::make_pair(diff, e));
+      }
+
+    }
+  }
+  return totalflips;
+}
+
 
 unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
 
