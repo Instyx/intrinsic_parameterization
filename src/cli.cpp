@@ -27,9 +27,8 @@ int main(int argc, char *argv[]) {
   std::string mesh_path = std::string(argv[2]);
   std::string outdir = std::string(argv[3]);
   read_mesh(mesh_path,V,F);
-  // igl::doublearea(V,F,A);
-  // V /=sqrt(A.sum());
-  // igl::doublearea(V,F,A);
+  igl::doublearea(V,F,A);
+  V /=sqrt(A.sum());
 
   std::fstream log;
   std::string filename = mesh_path.substr(mesh_path.find_last_of("/\\") + 1);
@@ -38,13 +37,14 @@ int main(int argc, char *argv[]) {
   std::string to_store_dir = outdir + "/" + mesh_name_wo_extension;
   Results res;
   if (method == "dirichlet"){
+    // test_Dirichlet_single(V, F, outdir, filename, std::cout);
     res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename);
   } else if (method == "arap"){
     // test_ARAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename);
+    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename);
   } else if (method == "asap"){
     // test_ASAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename);
+    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename);
   } else if (method == "symdirichlet"){
     // test_SymDirichlet_single(V, F, outdir, filename, log);
     res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename);
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   log << "init_time," << res.init_time << "\n";
   log << "energies";
   for(double i : res.energies)
-    log << "," << std::setprecision(16) << i;
+    log << "," << std::setprecision(32) << i;
   log << "\n";
 
   log << "flips";
