@@ -354,9 +354,9 @@ namespace std{
 unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
-  if(et==EnergyType::ASAP) energy = asap;
-  if(et==EnergyType::ARAP) energy = arap;
-  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  else if(et==EnergyType::ASAP) energy = asap;
+  else if(et==EnergyType::ARAP) energy = arap;
+  else if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
@@ -385,7 +385,8 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     if (!data_mesh.intTri->flipEdgeIfPossible(e)) continue;
     gcs::Edge flipped = e;
     diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
-    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+    double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) +
+                   energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
     if (before > after) {
       totalflips++;
       if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
@@ -396,6 +397,7 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
       data_mesh.intTri->flipEdgeIfPossible(flipped);
     }
   }
+  data_mesh.intTri->refreshQuantities();
   return totalflips;
 }
 
