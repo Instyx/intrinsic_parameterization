@@ -117,7 +117,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   res.energies.push_back(curr_energy);
 
   std::cout << "  parameterization took " << duration_init << "ms in "<< iterations << " iterations" << std::endl;
-  std::cout << "    energy: " << curr_energy << std::endl;
+  std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
   igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
@@ -127,7 +127,6 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
 
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;
-  auto flip_func = queue_flip;
 
   UV_iparam = UV_ext;
   while(itr<max_iterations && std::abs(past_energy-curr_energy)>tol){
@@ -138,10 +137,13 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     unsigned total_del_flips = 0;
 
     auto start = std::chrono::high_resolution_clock::now();
-    total_flips = flip_func(data_mesh, UV_iparam, total_del_flips, method);
+    // total_flips = queue_flip(data_mesh, UV_iparam, total_del_flips, method);
+    unsigned flips, del;
+    start = std::chrono::high_resolution_clock::now();
+    total_flips = queue_flip(data_mesh, UV_iparam, total_del_flips, method);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "  found " << total_flips << " improving flips, " << total_del_flips <<" were delaunay" << std::endl;
+    std::cout << "  found " << total_flips << " improving flips, " << total_del_flips <<" were delaunay in "<< duration << "ms" << std::endl;
     res.flips.push_back(total_flips);
     res.flips.push_back(total_del_flips);
     res.flip_durations.push_back(duration);
@@ -150,7 +152,6 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     }
     curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
     res.energies.push_back(curr_energy);
-    std::cout << "    energy: " << curr_energy << std::endl;
 
     // Parametrize using new connectivity + Jacobians
     iterations = 1;
@@ -160,6 +161,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
         UV_iparam = harmonic(data_mesh, true);
         end = std::chrono::high_resolution_clock::now();
         curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
+        std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
         break;
       }
       case EnergyType::ASAP:{
@@ -195,7 +197,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     res.energies.push_back(curr_energy);
 
     std::cout << "  parameterization took " << duration << "ms in "<< iterations << " iterations" << std::endl;
-    std::cout << "    energy: " << curr_energy << std::endl;
+    std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
 
     ++itr;
     std::string to_store = to_store_dir + "/inbetween/" + mesh_name +"_"+ std::to_string(itr);
