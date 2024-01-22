@@ -7,20 +7,12 @@ import sys
 import glob
 from pathlib import Path
 
+output_folder = "output"
 
 cblack = (0.0, 0.0, 0.0)
 cA = (0.0, 0.149, 0.933)
 cB = (0.989, 0.908, 0.0)
 cC = (0.989, 0.149 , 0.908)
-
-methods = ["dirichlet","asap","arap","symdirichlet"]
-method = 0
-flat = False
-meshes = sorted(glob.glob(f"{output_folder}/*/"))
-
-i = 0
-if mesh:
-    i = meshes.index(f"{output_folder}/{mesh}/")
 
 mesh = None
 try:
@@ -34,20 +26,35 @@ try:
 except:
     pass
 
-output_folder = "output"
+
+
+
+methods = ["dirichlet","asap","arap","symdirichlet"]
+method = 0
+flat = False
+meshes = sorted(glob.glob(f"{output_folder}/*/"))
+
+i = 0
+if mesh:
+    try:
+        i = meshes.index(f"{output_folder}/{mesh}/")
+    except:
+        pass
+
+
+
 
 ps.init()
 #ps.load_blendable_material("myflat", ["../textures/texturered.png","../textures/texturegreen.png","../textures/texture.png","../textures/textureblack.png"]);
 ps.set_ground_plane_mode("none");
 ps.set_SSAA_factor(2)
 
-
+paramesh = None
 def update_param():
     global ext_mesh, iparam_mesh, psmesh, paramesh, oldView
     if flat:
         ps.set_navigation_style("planar")
         psmesh.set_enabled(False)
-        paramesh.set_enabled()
         if toggle:
             V = iparam_mesh.point_data["obj:vt"]
         else:
@@ -55,12 +62,14 @@ def update_param():
         F = ext_mesh.cells[0].data
         V -= V.mean(axis=0)
         V = V/max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+        paramesh = ps.register_surface_mesh("ParaMesh", V, F, material="clay", color=(152/255,152/255,152/255), edge_color=(0,0,0), edge_width=1, enabled=True);
         # x = (V[:,0].max()-V[:,0].min())/2 + V[:,0].min()
         # y = (V[:,1].max()-V[:,1].min())/2 + V[:,1].min()
-        paramesh = ps.register_surface_mesh("ParaMesh", V, F, material="clay", color=(152/255,152/255,152/255), edge_color=(0,0,0), edge_width=1);
+
     else:
         ps.set_navigation_style("turntable")
-        paramesh.set_enabled(False)
+        if paramesh:
+            paramesh.set_enabled(False)
         psmesh.set_enabled()
 
     if toggle:
@@ -98,6 +107,17 @@ def update_mesh():
 toggle = True
 def callback():
     global i, method, psmesh, toggle, flat, oldView
+    psim.Text(f"Mesh {Path(meshes[i]).stem}");
+    psim.Text(f"Method {methods[method]}");
+    if toggle:
+        psim.Text(f"using normal parametrization");
+    else:
+        psim.Text(f"using intrinsic parametrization");
+    psim.Text(f"------------------------");
+    psim.Text(f"Change Mesh using 'a' and 'd'");
+    psim.Text(f"Change Method using 's' and 'w' or '1','2','3','4'");
+    psim.Text(f"Switch parameterization with SPACE");
+    psim.Text(f"Switch parameterization view with 'q'");
     if (psim.IsKeyPressed(ord("l")) or psim.IsKeyPressed(ord("L")) or psim.IsKeyPressed(ord("d")) or psim.IsKeyPressed(ord("D"))):
         i = (i+1)%len(meshes)
         update_mesh()
