@@ -74,7 +74,7 @@ bool diamondJacobians(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &
   temp = (se_len2*se_len2 - se_len1*se_len1 - se_len3*se_len3)/(-2*se_len1);
   E2_tilde << se_len1, temp, 0 , sqrt(se_len3*se_len3 - temp*temp);
 
-  data_mesh.inputGeometry->requireVertexPositions();
+ // data_mesh.inputGeometry->requireVertexPositions();
 
   //        v3 /\
   //          /  \
@@ -142,12 +142,12 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
 
   //double tolerance = 1e-6; // set tolerance to 1e-6
-  data_mesh.intTri->flipEdgeIfPossible(flipped);
+  //data_mesh.intTri->flipEdgeIfPossible(flipped);
   //if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
-  return after - before;
+    return after - before;
   //}
   //else {
-   // return 0;
+  //  return 0;
   //}
 }
 
@@ -174,6 +174,9 @@ unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &de
     ++i;
   }
 
+  std::sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
+    return diffs[i] < diffs[j];
+    });
   delaunay_flips = 0;
   double tolerance = 1e-6; // set tolerance to 1e-6
   for (size_t i = 0; i < indices.size(); i++) {
@@ -404,9 +407,9 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
 unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
-  if(et==EnergyType::ASAP) energy = asap;
-  if(et==EnergyType::ARAP) energy = arap;
-  if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  else if(et==EnergyType::ASAP) energy = asap;
+  else if(et==EnergyType::ARAP) energy = arap;
+  else if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireFaceAreas();
   unsigned totalflips = 0;
@@ -419,40 +422,38 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
     gcs::Face f2 = e.halfedge().twin().face();
     Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
     double energy_diff =  flippeddiff(data_mesh, UV, e, et);
-    if(energy_diff<0)
-      q.push(std::make_pair(energy_diff, e));
+    if(energy_diff<=0)
+      q.push(std::make_pair(-1*energy_diff, e));
   }
+  std::cout << "pq size: " << q.size() << std::endl;
   while (!q.empty()){
     gcs::Edge e = q.top().second;
-    double energy_diff = q.top().first;
-    if(energy_diff>0) break; // there is no decreasing flip
+    double energy_diff = -1*q.top().first;
+    std::cout << "max diff: " <<energy_diff << std::endl;
+    if(energy_diff>=0) break; // there is no decreasing flip
     q.pop();
     if(e.isBoundary()) continue;
-    gcs::Face f1 = e.halfedge().face();
-    gcs::Face f2 = e.halfedge().twin().face();
+    double actual_energy_diff = flippeddiff(data_mesh, UV, e, et);
+    if (actual_energy_diff > energy_diff) continue;
+    
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     std::array<size_t, 4> quad = {halfedges[0].vertex().getIndex(), halfedges[1].vertex().getIndex(), halfedges[2].vertex().getIndex(), halfedges[3].vertex().getIndex()};
     std::sort(quad.begin(), quad.end());
     if (checked_diamonds.find(std::make_tuple(quad[0],quad[1],quad[2],quad[3])) != checked_diamonds.end()) continue;
     else checked_diamonds[std::make_tuple(quad[0],quad[1],quad[2],quad[3])] = true;
-    double actual_energy_diff = flippeddiff(data_mesh, UV, e, et);
 
-    // check if old value
-    if (actual_energy_diff > energy_diff) {
-      continue;
-    } else {
-      data_mesh.intTri->flipEdgeIfPossible(e);
-      totalflips++;
-      if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
-      for (size_t i = 0; i < 4; i++) {
-        gcs::Edge next_e = halfedges[i].edge(); 
-        double diff = flippeddiff(data_mesh, UV, e, et);
-        if(diff<0)
-          q.push(std::make_pair(diff, e));
-      }
-
+    data_mesh.intTri->flipEdgeIfPossible(e);
+    totalflips++;
+    if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
+    for (size_t i = 0; i < 4; i++) {
+      gcs::Edge next_e = halfedges[i].edge(); 
+      double diff = flippeddiff(data_mesh, UV, next_e, et);
+      if(diff<=0)
+        q.push(std::make_pair(-1*diff, next_e));
     }
   }
+
+  data_mesh.intTri->refreshQuantities();
   return totalflips;
 }
 
@@ -546,5 +547,48 @@ unsigned delaunay_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ener
   }
   data_mesh.intTri->refreshQuantities();
   std::cout << " delaunay flips: " << delaunay << std::endl;
+  return totalflips;
+}
+
+
+
+unsigned asIDTasPossible(DataGeo &data_mesh){
+  unsigned totalflips = 0;
+  unsigned flips = 1;
+  while(flips){
+    unsigned local_flips = 0;
+    for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+      if(e.isBoundary()) continue; 
+      std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+
+      //        v3 /\
+      //          /  \
+      //         /    \
+      //     v1 / _ e _\ v2
+      //        \     /
+      //         \   /
+      //          \ /
+      //          v4
+      size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
+      size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
+      size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
+      size_t v4 = data_mesh.intTri->vertexIndices[halfedges[2].tipVertex()];
+      // if flip causes self loop, don't flip
+      if(v3==v4) {
+        std::cout << "self loop" << std::endl;
+        continue;
+      }
+      // if one of the end vertices has degree smaller than 3, don't flip
+      if(halfedges[1].tipVertex().degree()<=3 || halfedges[0].tailVertex().degree()<=3) {
+        std::cout << "degree 3" << std::endl;
+        continue;
+      }
+      if(data_mesh.intTri->isDelaunay(e)) continue;
+      if(data_mesh.intTri->flipEdgeIfPossible(e)) local_flips++;
+    }
+    std::cout << "flipso: " << local_flips << std::endl;
+    flips = local_flips;
+    totalflips += flips;
+  }
   return totalflips;
 }

@@ -39,3 +39,7 @@ unsigned edgeorder_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned 
 unsigned delaunay_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
 
 unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
+
+unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et);
+
+unsigned asIDTasPossible(DataGeo &data_mesh);
