@@ -142,7 +142,7 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
 
   //double tolerance = 1e-6; // set tolerance to 1e-6
-  //data_mesh.intTri->flipEdgeIfPossible(flipped);
+  data_mesh.intTri->flipEdgeIfPossible(flipped);
   //if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
     return after - before;
   //}
@@ -416,22 +416,20 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
   delaunay_flips = 0;
   std::unordered_map<std::tuple<int, int, int, int>, bool> checked_diamonds;
   std::priority_queue<std::pair<double, gcs::Edge> > q;
+  std::vector<double> actual_energies(data_mesh.intTri->intrinsicMesh->nEdges(),  0);
   for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
     double energy_diff =  flippeddiff(data_mesh, UV, e, et);
     if(energy_diff<0)
       q.push(std::make_pair(-1*energy_diff, e));
+    actual_energies[e.getIndex()] = energy_diff;
   }
-  std::cout << "pq size: " << q.size() << std::endl;
   while (!q.empty()){
     gcs::Edge e = q.top().second;
     double energy_diff = -1*q.top().first;
-    // std::cout << "max diff: " <<energy_diff << std::endl;
     if(energy_diff>=0) break; // there is no decreasing flip
     q.pop();
     if(e.isBoundary()) continue;
-    double actual_energy_diff = flippeddiff(data_mesh, UV, e, et);
-    if (actual_energy_diff > energy_diff) continue;
-    
+    if (energy_diff!=actual_energies[e.getIndex()]) continue;
     std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
     std::array<size_t, 4> quad = {halfedges[0].vertex().getIndex(), halfedges[1].vertex().getIndex(), halfedges[2].vertex().getIndex(), halfedges[3].vertex().getIndex()};
     std::sort(quad.begin(), quad.end());
@@ -446,9 +444,9 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
       double diff = flippeddiff(data_mesh, UV, next_e, et);
       if(diff<0)
         q.push(std::make_pair(-1*diff, next_e));
+      actual_energies[next_e.getIndex()] = diff;
     }
   }
-
   data_mesh.intTri->refreshQuantities();
   return totalflips;
 }
