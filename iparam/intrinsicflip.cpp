@@ -440,7 +440,7 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
     totalflips++;
     if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
     for (size_t i = 0; i < 4; i++) {
-      gcs::Edge next_e = halfedges[i].edge(); 
+      gcs::Edge next_e = halfedges[i].edge();
       double diff = flippeddiff(data_mesh, UV, next_e, et);
       if(diff<0)
         q.push(std::make_pair(-1*diff, next_e));
@@ -552,7 +552,7 @@ unsigned asIDTasPossible(DataGeo &data_mesh){
   while(flips){
     unsigned local_flips = 0;
     for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
-      if(e.isBoundary()) continue; 
+      if(e.isBoundary()) continue;
       std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
 
       //        v3 /\
@@ -577,9 +577,9 @@ unsigned asIDTasPossible(DataGeo &data_mesh){
         //std::cout << "degree 3" << std::endl;
         continue;
       }
-      if(data_mesh.intTri->flipEdgeIfNotDelaunay(e)) 
+      if(data_mesh.intTri->flipEdgeIfNotDelaunay(e))
           local_flips++;
-      
+
     }
     //std::cout << "flipso: " << local_flips << std::endl;
     flips = local_flips;

@@ -9,14 +9,16 @@
 
 int main(int argc, char *argv[]) {
   // evaluation
-  if(argc != 4) {
+  if(argc < 4) {
     std::cout << "You have to specify the parameterization" << std::endl;
     std::cout << "" << std::endl;
-    std::cout << "./cli <method> <mesh> <output>" << std::endl;
+    std::cout << "./cli <method> <mesh> <output> [start] [queue]" << std::endl;
     std::cout << "" << std::endl;
     std::cout << "<method> in [dirichlet, arap, asap, symdirichlet]" << std::endl;
     std::cout << "<mesh>   as filepath" << std::endl;
     std::cout << "<output> as directory" << std::endl;
+    std::cout << "[start] in [normal (dc), delaunay]" << std::endl;
+    std::cout << "[queue] in [queue (dc), prio]" << std::endl;
     return 0;
   }
   Eigen::MatrixXd V;
@@ -26,6 +28,10 @@ int main(int argc, char *argv[]) {
   std::string method = std::string(argv[1]);
   std::string mesh_path = std::string(argv[2]);
   std::string outdir = std::string(argv[3]);
+  bool start = argc > 4 && (std::string(argv[4]) == "delaunay");
+  // std::cout << start << "\n";
+  bool queue = argc > 5 && (std::string(argv[5]) == "prio");
+  // std::cout << queue << "\n";
   read_mesh(mesh_path,V,F);
   igl::doublearea(V,F,A);
   V /=sqrt(A.sum());
@@ -38,16 +44,16 @@ int main(int argc, char *argv[]) {
   Results res;
   if (method == "dirichlet"){
     // test_Dirichlet_single(V, F, outdir, filename, std::cout);
-    res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename);
+    res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue);
   } else if (method == "arap"){
     // test_ARAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename);
+    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename, start, queue);
   } else if (method == "asap"){
     // test_ASAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename);
+    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename, start, queue);
   } else if (method == "symdirichlet"){
     // test_SymDirichlet_single(V, F, outdir, filename, log);
-    res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename);
+    res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue);
   } else {
     std::cout << "Method '" << method << "' is unknown." << std::endl;
     return 1;
@@ -57,7 +63,8 @@ int main(int argc, char *argv[]) {
 
   double sum = res.init_time;
   // print res
-  log << filename << "," << method << "\n";
+  log << filename << "," << method << "," << (start ? "delaunay_init" : "normal_init") << "," << (queue ? "priority_queue" : "normal_queue") << "\n";
+
   log << "init_time," << res.init_time << "\n";
   log << "energies";
   for(double i : res.energies)
