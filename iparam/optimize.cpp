@@ -123,6 +123,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   }
   duration_init = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   // collecting results
+  res.opt_durations.push_back(duration_init);
   res.opt_iterations.push_back(iterations);
   res.energies.push_back(curr_energy);
 

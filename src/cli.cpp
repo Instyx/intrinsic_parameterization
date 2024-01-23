@@ -59,8 +59,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   std::filesystem::create_directory(to_store_dir);
-  log.open(to_store_dir+"/results_"+method+".log", std::ios::out);
 
+  log.open(to_store_dir+"/results_"+method+".log", std::ios::out);
   double sum = res.init_time;
   // print res
   log << filename << "," << method << "," << (start ? "delaunay_init" : "normal_init") << "," << (queue ? "priority_queue" : "normal_queue") << "\n";

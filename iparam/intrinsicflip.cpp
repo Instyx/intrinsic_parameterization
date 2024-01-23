@@ -141,14 +141,14 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
 
   double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
 
-  //double tolerance = 1e-6; // set tolerance to 1e-6
+  double tolerance = 1e-6; // set tolerance to 1e-6
   data_mesh.intTri->flipEdgeIfPossible(flipped);
-  //if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
+  if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
     return after - before;
-  //}
-  //else {
-  //  return 0;
-  //}
+  }
+  else {
+    return 0;
+  }
 }
 
 unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
@@ -390,7 +390,9 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
     double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) +
                    energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
-    if (before > after) {
+    double tolerance = 1e-6;
+
+    if (before > after && (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance)) {
       totalflips++;
       if(data_mesh.intTri->isDelaunay(e)) delaunay_flips++;
       for (size_t i = 0; i < 4; i++) {
