@@ -152,7 +152,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     }
     curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
     res.energies.push_back(curr_energy);
-
+    std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
     // Parametrize using new connectivity + Jacobians
     iterations = 1;
     switch (method) {
@@ -161,7 +161,6 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
         UV_iparam = harmonic(data_mesh, true);
         end = std::chrono::high_resolution_clock::now();
         curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
-        std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
         break;
       }
       case EnergyType::ASAP:{
@@ -203,6 +202,16 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     std::string to_store = to_store_dir + "/inbetween/" + mesh_name +"_"+ std::to_string(itr);
     to_store += ".obj";
     igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV_iparam, data_mesh.F);
+    try {
+      store_intrinsic_edges(data_mesh, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
+    } catch (...) {
+      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    }
+    try {
+      store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
+    } catch (...) {
+      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    }
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
@@ -368,7 +377,7 @@ Results optimize_single_idt(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     }
     curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
     res.energies.push_back(curr_energy);
-
+    std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
     // Parametrize using new connectivity + Jacobians
     iterations = 1;
     switch (method) {
@@ -411,14 +420,22 @@ Results optimize_single_idt(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     res.opt_durations.push_back(duration);
     res.opt_iterations.push_back(iterations);
     res.energies.push_back(curr_energy);
-
+  std::cout << "  WTF?" << std::endl;
     std::cout << "  parameterization took " << duration << "ms in "<< iterations << " iterations" << std::endl;
     std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
 
+    std::cout << "  WTF?" << std::endl;
+    try {
+      store_intrinsic_edges(data_mesh, to_store_dir + "/inbetween/" + mesh_name_wo_extension+"_"+ std::to_string(itr));
+    } catch (...) {
+      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    }
+    try {
+      store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/inbetween/" + mesh_name_wo_extension+"_"+ std::to_string(itr));
+    } catch (...) {
+      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    }
     ++itr;
-    std::string to_store = to_store_dir + "/inbetween/" + mesh_name +"_"+ std::to_string(itr);
-    to_store += ".obj";
-    igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV_iparam, data_mesh.F);
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
