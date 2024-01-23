@@ -6,6 +6,7 @@ import polyscope.imgui as psim
 import sys
 import glob
 from pathlib import Path
+import loader
 
 output_folder = "output"
 
@@ -15,22 +16,22 @@ cB = (0.989, 0.908, 0.0)
 cC = (0.989, 0.149 , 0.908)
 
 mesh = None
-try:
-    mesh = sys.argv[1]
-except:
-    pass
-
 method = 0
+
 try:
-    method = sys.argv[2]
+    get_ipython().__class__.__name__
 except:
-    pass
-
-
+    try:
+        mesh = sys.argv[1]
+    except:
+        pass
+    try:
+        method = sys.argv[2]
+    except:
+        pass
 
 
 methods = ["dirichlet","asap","arap","symdirichlet"]
-method = 0
 flat = False
 meshes = sorted(glob.glob(f"{output_folder}/*/"))
 
@@ -51,64 +52,74 @@ ps.set_SSAA_factor(2)
 
 paramesh = None
 def update_param():
-    global ext_mesh, iparam_mesh, psmesh, paramesh, oldView
-    if flat:
-        ps.set_navigation_style("planar")
-        psmesh.set_enabled(False)
-        if toggle:
-            V = iparam_mesh.point_data["obj:vt"]
-        else:
-            V = ext_mesh.point_data["obj:vt"]
-        F = ext_mesh.cells[0].data
-        V -= V.mean(axis=0)
-        V = V/max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
-        paramesh = ps.register_surface_mesh("ParaMesh", V, F, material="clay", color=(152/255,152/255,152/255), edge_color=(0,0,0), edge_width=1, enabled=True);
-        # x = (V[:,0].max()-V[:,0].min())/2 + V[:,0].min()
-        # y = (V[:,1].max()-V[:,1].min())/2 + V[:,1].min()
-
+    global s
+    # if flat:
+    #     ps.set_navigation_style("planar")
+    #     s.ps_e_mesh.set_enabled(False)
+    #     s.ps_i_mesh.set_enabled(False)
+    #     if toggle:
+    #         V = iparam_mesh.point_data["obj:vt"]
+    #     else:
+    #         V = s.e_mesh.point_data["obj:vt"]
+    #     F = s.e_mesh.cells[0].data
+    #     V -= V.mean(axis=0)
+    #     V = V/max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+    #     paramesh = ps.register_surface_mesh("ParaMesh", V, F, material="clay", color=(152/255,152/255,152/255), edge_color=(0,0,0), edge_width=1, enabled=True);
+    #     # x = (V[:,0].max()-V[:,0].min())/2 + V[:,0].min()
+    #     # y = (V[:,1].max()-V[:,1].min())/2 + V[:,1].min()
+    #
+    # else:
+    #     ps.set_navigation_style("turntable")
+    #     if paramesh:
+    #         paramesh.set_enabled(False)
+    #     psmesh.set_enabled()
+    if s.intrinsic:
+        s.ps_i_mesh.set_enabled(True)
+        s.ps_e_mesh.set_enabled(False)
+        # psmesh.add_parameterization_quantity("Intrinsic", iparam_mesh.point_data["obj:vt"], defined_on="vertices",
+        #     coords_type="unit", viz_style="checker",checker_colors=(cblack, cA), checker_size=0.05, enabled=False)
+        # psmesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
+        #                                    coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
     else:
-        ps.set_navigation_style("turntable")
-        if paramesh:
-            paramesh.set_enabled(False)
-        psmesh.set_enabled()
+        s.ps_i_mesh.set_enabled(False)
+        s.ps_e_mesh.set_enabled(True)
 
-    if toggle:
-        psmesh.add_parameterization_quantity("Intrinsic", iparam_mesh.point_data["obj:vt"], defined_on="vertices",
-            coords_type="unit", viz_style="checker",checker_colors=(cblack, cA), checker_size=0.05, enabled=False)
-        psmesh.add_parameterization_quantity("Normal", ext_mesh.point_data["obj:vt"], defined_on="vertices",
-                                           coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
-    else:
-        psmesh.add_parameterization_quantity("Normal", ext_mesh.point_data["obj:vt"], defined_on="vertices",
-                                           coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=False)
-        psmesh.add_parameterization_quantity("Intrinsic", iparam_mesh.point_data["obj:vt"], defined_on="vertices",
-                                       coords_type="unit", viz_style="checker",checker_colors=(cblack, cA), checker_size=0.05, enabled=True)
 
-def update_mesh():
-    global i, method, methods
-    id = Path(meshes[i]).stem
-    print(id)
-    print(methods[method])
+def update_meshes():
+    global s
+    id = Path(meshes[s.i]).stem
+    print(id, methods[s.method])
     def add_mesh():
-        global ext_mesh, iparam_mesh, psmesh
-        ext_mesh = meshio.read(f"{output_folder}/{id}/{methods[method]}/{id}_ext.obj");
-        iparam_mesh = meshio.read(f"{output_folder}/{id}/{methods[method]}/{id}_iparam.obj");
-        # inbetween_meshes = [meshio.read(m) for m in sorted(glob.glob(f"{output_folder}/{id}/{methods[method]}/inbetween/*.obj"))]
-        V = ext_mesh.points
-        V -= V.mean(axis=0)
-        V = V/max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
-        F = ext_mesh.cells[0].data
-        psmesh = ps.register_surface_mesh("Mesh", V, F, material="clay", color=(0,0,1), edge_color=(0,0,0), edge_width=0);
+        global s
+        s.e_mesh = meshio.read(f"{output_folder}/{id}/{methods[s.method]}/{id}_ext.obj")
 
-        # for i,m in enumerate(inbetween_meshes):
-        #     psmesh.add_parameterization_quantity(f"Inbetween_{i}", m.point_data["obj:vt"], defined_on="vertices",
-        #                                    coords_type="unit", viz_style="checker",checker_colors=(cblack, cC),checker_size=0.05, enabled=True)
+        V = s.e_mesh.points
+        mean = V.mean(axis=0)
+        V -= mean
+        scaling = max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+        V /= scaling
+        F = s.e_mesh.cells[0].data
+
+        s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=(0,0,1), edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
+        s.ps_e_mesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
+                                           coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
+
+        s.i_mesh = loader.create_intrinsic_mesh(f"{output_folder}/{id}/{methods[s.method]}/", id)
+        s.i_mesh.V -= mean
+        s.i_mesh.V /= scaling
+        s.i_mesh.eV -= mean
+        s.i_mesh.eV /= scaling
+        s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
+        s.ps_i_mesh.set_enabled(s.intrisic)
+        s.ps_i_ogedges.set_enabled(False)
+        s.ps_i_edges.set_enabled(False)
     add_mesh()
 
 toggle = True
 def callback():
-    global i, method, psmesh, toggle, flat, oldView
-    psim.Text(f"Mesh {Path(meshes[i]).stem}");
-    psim.Text(f"Method {methods[method]}");
+    global s
+    psim.Text(f"Mesh {Path(meshes[s.i]).stem}");
+    psim.Text(f"Method {methods[s.method]}");
     if toggle:
         psim.Text(f"using normal parametrization");
     else:
@@ -119,55 +130,68 @@ def callback():
     psim.Text(f"Switch parameterization with SPACE");
     psim.Text(f"Switch parameterization view with 'q'");
     if (psim.IsKeyPressed(ord("l")) or psim.IsKeyPressed(ord("L")) or psim.IsKeyPressed(ord("d")) or psim.IsKeyPressed(ord("D"))):
-        i = (i+1)%len(meshes)
-        update_mesh()
+        s.i = (s.i+1)%len(meshes)
+        update_meshes()
         update_param()
         ps.reset_camera_to_home_view()
     elif (psim.IsKeyPressed(ord("h")) or psim.IsKeyPressed(ord("H")) or psim.IsKeyPressed(ord("a"))or psim.IsKeyPressed(ord("A"))):
-        i = (i-1)%len(meshes)
-        update_mesh()
+        s.i = (s.i-1)%len(meshes)
+        update_meshes()
         update_param()
         ps.reset_camera_to_home_view()
     elif (psim.IsKeyPressed(ord("j")) or psim.IsKeyPressed(ord("J")) or psim.IsKeyPressed(ord("w")) or psim.IsKeyPressed(ord("W"))):
-        method = (method+1)%len(methods)
-        update_mesh()
+        s.method = (s.method+1)%len(methods)
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord("k")) or psim.IsKeyPressed(ord("K")) or psim.IsKeyPressed(ord("s")) or psim.IsKeyPressed(ord("S"))):
-        method = (method-1)%len(methods)
-        update_mesh()
+        s.method = (s.method-1)%len(methods)
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord("1"))):
-        method = 0
-        update_mesh()
+        s.method = 0
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord("2"))):
-        method = 1
-        update_mesh()
+        s.method = 1
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord("3"))):
-        method = 2
-        update_mesh()
+        s.method = 2
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord("4"))):
-        method = 3
-        update_mesh()
+        s.method = 3
+        update_meshes()
         update_param()
     elif (psim.IsKeyPressed(ord(" "))):
-        toggle = not toggle
+        s.intrinsic = not s.intrinsic
         update_param()
     elif (psim.IsKeyPressed(ord("q")) or psim.IsKeyPressed(ord("Q"))):
-        flat = not flat
-        newView = ps.get_view_as_json()
-        ps.set_view_from_json(oldView)
-        oldView = newView
-        update_param()
+        pass
+        # flat = not flat
+        # newView = ps.get_view_as_json()
+        # ps.set_view_from_json(oldView)
+        # oldView = newView
+        # update_param()
     else:
         return
 
-oldView = ps.get_view_as_json()
-update_mesh()
+# state
+s = loader.dotdict(
+    oldView = ps.get_view_as_json(),
+    intrinsic = False,
+    method = method,
+    i = i,
+    e_mesh = None,
+    ps_e_mesh = None,
+    i_mesh = None,
+    ps_i_mesh = None,
+    ps_i_edges = None,
+    ps_i_ogedges = None,
+)
+update_meshes()
 update_param()
 ps.reset_camera_to_home_view()
-oldView = ps.get_view_as_json()
+s.oldView = ps.get_view_as_json()
 ps.set_user_callback(callback)
 ps.show();
