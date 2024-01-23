@@ -14,7 +14,7 @@ Eigen::VectorXd interpolate(const gcs::SurfacePoint& pt, const Eigen::MatrixXd& 
   }
 }
 
-void store_intrinsic_edges(const DataGeo &data_mesh, std::string filepath) {
+void store_intrinsic_edges(const DataGeo &data_mesh, const std::string filepath) {
   std::ofstream out(filepath+".int.edges");
   std::vector<Eigen::VectorXd> points;
   std::vector<std::array<int, 2>> edges, og_edges;
@@ -48,7 +48,7 @@ void store_intrinsic_edges(const DataGeo &data_mesh, std::string filepath) {
 }
 
 
-void store_intrinsic_mesh(DataGeo &data_mesh, std::string filename){
+void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename){
   gcs::CommonSubdivision& cs = data_mesh.intTri->getCommonSubdivision();
   cs.constructMesh();
 
@@ -56,6 +56,14 @@ void store_intrinsic_mesh(DataGeo &data_mesh, std::string filename){
   auto data = cs.copyFromB(faceIDs);
   // auto data = cs.copyFromA(faceIDs);
   gcs::VertexData<gc::Vector3> csPositions = cs.interpolateAcrossA(data_mesh.inputGeometry->vertexPositions);
+  gcs::VertexData<double> u(*data_mesh.intTri->intrinsicMesh);
+  gcs::VertexData<double> v(*data_mesh.intTri->intrinsicMesh);
+  for (auto ver : data_mesh.intTri->intrinsicMesh->vertices()) {
+    u[ver] = UV(ver.getIndex(),0);
+    v[ver] = UV(ver.getIndex(),1);
+  }
+  gcs::VertexData<double> uPositions = cs.interpolateAcrossB(u);
+  gcs::VertexData<double> vPositions = cs.interpolateAcrossB(v);
   // separate x/y/z coordinates
   gcs::VertexData<double> x(*cs.mesh);
   gcs::VertexData<double> y(*cs.mesh);
@@ -73,6 +81,8 @@ void store_intrinsic_mesh(DataGeo &data_mesh, std::string filename){
   richData.addVertexProperty("x", x);
   richData.addVertexProperty("y", y);
   richData.addVertexProperty("z", z);
+  richData.addVertexProperty("u", uPositions);
+  richData.addVertexProperty("v", vPositions);
   richData.addFaceProperty("OGFaceIds", data);
   richData.write(filename+".int.ply");
 }

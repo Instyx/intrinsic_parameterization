@@ -214,7 +214,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
   try {
-    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
@@ -222,7 +222,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
 }
 
 
-// only differences are calling asIDTasPossible and 
+// only differences are calling asIDTasPossible and
 // for the extrinsic part making the igrad flag = true
 // so can be done easily above adding a flag to signature
 Results optimize_single_idt(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType method, std::string dir, std::string mesh_name){
@@ -430,7 +430,7 @@ Results optimize_single_idt(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
   try {
-    store_intrinsic_mesh(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
