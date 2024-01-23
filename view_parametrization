@@ -11,9 +11,9 @@ import loader
 output_folder = "output"
 
 cblack = (0.0, 0.0, 0.0)
-cA = (0.0, 0.149, 0.933)
-cB = (0.989, 0.908, 0.0)
-cC = (0.989, 0.149 , 0.908)
+cA = (0.082, 0.463, 0.98)
+cB = (0.957, 0.733, 0.043)
+cC = (0.4, 0.4 , 0.44)
 
 mesh = None
 method = 0
@@ -35,7 +35,7 @@ methods = ["dirichlet","asap","arap","symdirichlet"]
 flat = False
 meshes = sorted(glob.glob(f"{output_folder}/*/"))
 
-i = 0
+i = 20
 if mesh:
     try:
         i = meshes.index(f"{output_folder}/{mesh}/")
@@ -100,7 +100,7 @@ def update_meshes():
         V /= scaling
         F = s.e_mesh.cells[0].data
 
-        s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=(0,0,1), edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
+        s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=cC, edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
         s.ps_e_mesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
                                            coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
 
