@@ -214,19 +214,19 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
 
     ++itr;
-    std::string to_store = to_store_dir + "/inbetween/" + mesh_name +"_"+ std::to_string(itr);
-    to_store += ".obj";
-    igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV_iparam, data_mesh.F);
-    try {
-      store_intrinsic_edges(data_mesh, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
-    } catch (...) {
-      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
-    }
-    try {
-      store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
-    } catch (...) {
-      std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
-    }
+    // std::string to_store = to_store_dir + "/inbetween/" + mesh_name +"_"+ std::to_string(itr);
+    // to_store += ".obj";
+    // igl::writeOBJ(to_store, data_mesh.V, data_mesh.F, CN, FN, UV_iparam, data_mesh.F);
+    // try {
+    //   store_intrinsic_edges(data_mesh, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
+    // } catch (...) {
+    //   std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    // }
+    // try {
+    //   store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/inbetween/" + mesh_name_wo_extension +"_"+ std::to_string(itr));
+    // } catch (...) {
+    //   std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+    // }
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
