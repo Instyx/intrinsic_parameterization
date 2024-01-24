@@ -19,3 +19,9 @@ void test_Dirichlet_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string d
 void test_all();
 
 void test_all_withtextures();
+
+void test_gran();
+
+void testARAP_gran(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, unsigned flip_gran, unsigned max_itr, std::ostream &fout);
+
+void testSLIM_gran(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, unsigned flip_gran, unsigned max_itr, std::ostream &fout);

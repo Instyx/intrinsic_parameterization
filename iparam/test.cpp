@@ -56,6 +56,106 @@ DataGeo compareIDTvsGreedy(DataGeo &data_mesh){
 }
 
 
+void testARAP_gran(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, unsigned flip_gran, unsigned max_itr, std::ostream &fout){
+  // init
+  std::cout << "ARAP" << std::endl;
+  fout << mesh_name << "," << "arap" << ",";
+  DataGeo data_mesh;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  Eigen::MatrixXd UV = tutte(data_mesh, false);
+  double curr_energy = -1;
+  for(unsigned i = 0; i<max_itr ; ++i){
+    std::cout << "ITR: " << i << std::endl;
+    Eigen::MatrixXd new_UV;
+    ARAP_tillconverges(data_mesh, UV, new_UV, flip_gran, true, true, curr_energy);
+    UV = new_UV;
+    curr_energy = compute_total_energy(data_mesh, UV, EnergyType::ARAP , true);
+    std::cout << "energy: " << curr_energy << std::endl; 
+    unsigned del;
+    queue_flip(data_mesh, UV, del, EnergyType::ARAP);
+  }
+  std::cout << "granularity: " << flip_gran << " ;   " << "energy: " << curr_energy << std::endl;
+  fout << flip_gran << ","  << curr_energy << "," << '\n';
+}
+
+void testSLIM_gran(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::string mesh_name, unsigned flip_gran, unsigned max_itr, std::ostream &fout){
+  std::cout << "SYMMETRIC DIRICHLET" << std::endl;
+  fout << mesh_name << "," << "symdir" << ",";
+  DataGeo data_mesh;
+  data_mesh.V = V;
+  data_mesh.F = F;
+  data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
+  data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
+  data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
+  data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->requireFaceAreas();
+
+  igl::SLIMData slimdata;
+  // init
+  Eigen::MatrixXd UV = tutte(data_mesh, false);
+  for(unsigned i = 0; i<max_itr ; ++i){
+
+    std::cout << "ITR: " << i << std::endl;
+    slim_tillconverges(data_mesh, slimdata, data_mesh.V, data_mesh.F, UV, flip_gran, true);
+    std::cout << "energy: " << slimdata.energy/2 << std::endl; 
+    UV = slimdata.V_o;
+    unsigned del;
+    queue_flip(data_mesh, UV, del, EnergyType::SYMMETRIC_DIRICHLET);
+  }
+  double curr_energy = slimdata.energy/2;
+  fout << flip_gran << ","  << curr_energy << "," << '\n';
+
+}
+
+
+void test_gran(){
+  const char* folderPath = "../thingi_data";
+  DIR* directory = opendir(folderPath);
+  if (directory == NULL) {
+    std::cerr << "Failed to open directory." << std::endl;
+    return;
+  }
+  std::fstream  fout_arap, fout_symdir;
+  // opens an existing csv file or creates a new file.
+  fout_arap.open("results_gran_arap.log", std::ios::out | std::ios::app);
+  fout_symdir.open("results_gran_symdir.log", std::ios::out | std::ios::app);
+
+  // Read directory entries
+  struct dirent* entry;
+  while ((entry = readdir(directory)) != NULL) {
+    // Skip "." and ".." entries
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        continue;
+    }
+    std::string filePath = std::string(folderPath) + "/" + std::string(entry->d_name);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    DataGeo data_mesh; 
+    read_mesh(filePath,V,F);
+    testARAP_gran(V, F, std::string(entry->d_name), 5, 20, fout_arap);
+    testARAP_gran(V, F, std::string(entry->d_name), 10, 20, fout_arap);
+    testARAP_gran(V, F, std::string(entry->d_name), 100, 20, fout_arap);
+    testSLIM_gran(V, F, std::string(entry->d_name), 5, 20, fout_symdir);
+    testSLIM_gran(V, F, std::string(entry->d_name), 10, 20, fout_symdir);
+    testSLIM_gran(V, F, std::string(entry->d_name), 100, 20, fout_symdir);
+
+  }
+  fout_arap.close();
+  fout_symdir.close();
+  // Close the directory
+  closedir(directory);
+}
+
+
 unsigned flipEdgesifCoplanar(DataGeo &data_mesh, bool onlyDelaunay){
   Eigen::MatrixXd V = data_mesh.V;
   double tolarence = 1e-8;

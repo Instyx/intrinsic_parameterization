@@ -9,7 +9,7 @@
 
 int main(int argc, char *argv[]) {
   // evaluation
-  if(argc < 4) {
+  if(argc < 5) {
     std::cout << "You have to specify the parameterization" << std::endl;
     std::cout << "" << std::endl;
     std::cout << "./cli <method> <mesh> <output> [start] [queue]" << std::endl;
@@ -28,9 +28,10 @@ int main(int argc, char *argv[]) {
   std::string method = std::string(argv[1]);
   std::string mesh_path = std::string(argv[2]);
   std::string outdir = std::string(argv[3]);
-  bool start = argc > 4 && (std::string(argv[4]) == "delaunay");
+  int flip_gran = std::atoi(argv[4]);
+ // bool start = argc > 4 && (std::string(argv[4]) == "delaunay");
   // std::cout << start << "\n";
-  bool queue = argc > 5 && (std::string(argv[5]) == "prio");
+ // bool queue = argc > 5 && (std::string(argv[5]) == "prio");
   // std::cout << queue << "\n";
   read_mesh(mesh_path,V,F);
   igl::doublearea(V,F,A);
@@ -42,25 +43,29 @@ int main(int argc, char *argv[]) {
   std::string mesh_name_wo_extension =  filename.substr(0, lastindex);
   std::string to_store_dir = outdir + "/" + mesh_name_wo_extension;
   Results res;
+  log.open(to_store_dir+"/results_"+method+".log", std::ios::out);
   if (method == "dirichlet"){
     // test_Dirichlet_single(V, F, outdir, filename, std::cout);
-    res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue);
+    //res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue);
   } else if (method == "arap"){
     // test_ARAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename, start, queue);
+    // res = optimize_single(V, F, EnergyType::ARAP, outdir, filename, start, queue);
+    testARAP_gran(V, F, mesh_name_wo_extension, flip_gran, 5, log);
+
   } else if (method == "asap"){
     // test_ASAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename, start, queue);
+    //res = optimize_single(V, F, EnergyType::ASAP, outdir, filename, start, queue);
   } else if (method == "symdirichlet"){
     // test_SymDirichlet_single(V, F, outdir, filename, log);
-    res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue);
+    //res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue);
+    testSLIM_gran(V, F, mesh_name_wo_extension, flip_gran, 5, log);
   } else {
     std::cout << "Method '" << method << "' is unknown." << std::endl;
     return 1;
   }
+    /*
   std::filesystem::create_directory(to_store_dir);
 
-  log.open(to_store_dir+"/results_"+method+".log", std::ios::out);
   double sum = res.init_time;
   // print res
   log << filename << "," << method << "," << (start ? "delaunay_init" : "normal_init") << "," << (queue ? "priority_queue" : "normal_queue") << "\n";
@@ -103,5 +108,6 @@ int main(int argc, char *argv[]) {
   log << "\n";
   log << "total_duration_iparam," << sum << "\n";
   log << "total_duration_normal," << res.init_time+res.opt_durations.front() << "\n";
+  */
 	return 0;
 }
