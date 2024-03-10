@@ -25,23 +25,23 @@ for k,i in enumerate(sorted(glob.glob(f"{folder}/*.off"), key = os.path.getsize)
         except Exception as e:
             print("Failed method", m, "for mesh", i)
         print()
-        cmd = f"build/cli {m} {i} {output}_delaunay delaunay noprio"
-        print(cmd)
-        try:
-            sts = os.system(cmd)
-            if(sts == 2):
-                sys.exit(0)
-        except Exception as e:
-            print("Failed method", m, "for mesh", i)
-        print()
-        cmd = f"build/cli {m} {i} {output}_prio nodelaunay prio"
-        print(cmd)
-        try:
-            sts = os.system(cmd)
-            if(sts == 2):
-                sys.exit(0)
-        except Exception as e:
-            print("Failed method", m, "for mesh", i)
-        print()
+#        cmd = f"build/cli {m} {i} {output}_delaunay delaunay noprio"
+#        print(cmd)
+#        try:
+#            sts = os.system(cmd)
+#            if(sts == 2):
+#                sys.exit(0)
+#        except Exception as e:
+#            print("Failed method", m, "for mesh", i)
+#        print()
+#        cmd = f"build/cli {m} {i} {output}_prio nodelaunay prio"
+#        print(cmd)
+#        try:
+#            sts = os.system(cmd)
+#            if(sts == 2):
+#                sys.exit(0)
+#        except Exception as e:
+#            print("Failed method", m, "for mesh", i)
+#        print()
     print()
     print()

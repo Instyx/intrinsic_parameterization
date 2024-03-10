@@ -104,6 +104,7 @@ if(argc < 4) {
   log << "total_duration_iparam," << sum << "\n";
   log << "total_duration_normal," << res.init_time+res.opt_durations.front() << "\n";
   log << "subdivision_time," << res.cs_time << "\n";
+  log << "mesh_construction_time," << res.cm_time << "\n";
   log << "ext_vertices," << res.ext_vertex_count << "\n";
   log << "cs_vertices," << res.cs_vertex_count << "\n";
 	return 0;

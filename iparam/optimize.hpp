@@ -7,6 +7,7 @@
 struct Results{
   double init_time;
   double cs_time;
+  double cm_time;
   int ext_vertex_count;
   int cs_vertex_count;
   std::vector<double> energies;

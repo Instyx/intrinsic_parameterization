@@ -48,17 +48,25 @@ void store_intrinsic_edges(const DataGeo &data_mesh, const std::string filepath)
     out << e[0] << "," << e[1] << std::endl;
 }
 
+void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename){
+  Results res;
+  return store_intrinsic_mesh(data_mesh, UV, filename, res);
+}
 
 void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, Results &res){
 
   auto start = std::chrono::high_resolution_clock::now();
   gcs::CommonSubdivision& cs = data_mesh.intTri->getCommonSubdivision();
-  cs.constructMesh();
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   res.cs_time = duration;
-  res.ext_vertex_count = cs.meshA.nVertices();
-  res.cs_vertex_count = cs.nVertices();
+  start = std::chrono::high_resolution_clock::now();
+  cs.constructMesh();
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  res.cm_time = duration;
+  res.ext_vertex_count = data_mesh.intTri->intrinsicMesh->nVertices();
+  res.cs_vertex_count = cs.mesh->nVertices();
   return;
 
   gcs::FaceData<double> faceIDs = niceColors(*data_mesh.intTri->intrinsicMesh, 7);
