@@ -46,8 +46,8 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   to_store_dir+= "/"+readable_name;
 
   std::filesystem::create_directory(to_store_dir);
-  std::string to_store_dir_all = to_store_dir + "/inbetween";
-  std::filesystem::create_directory(to_store_dir_all);
+  //std::string to_store_dir_all = to_store_dir + "/inbetween";
+  //std::filesystem::create_directory(to_store_dir_all);
 
   // Datastructure construction (to be fair this is only necessary for iparam)
   auto start = std::chrono::high_resolution_clock::now();
@@ -130,7 +130,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   std::cout << "  parameterization took " << duration_init << "ms in "<< iterations << " iterations" << std::endl;
   std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
+  //igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
 
   //IPARAM
   std::cout << "------------ IPARAM --------------" <<std::endl;
@@ -230,15 +230,16 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
-  igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
-
+  //igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
+/*
   try {
     store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
+  */
   try {
-    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension);
+    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension, res);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }

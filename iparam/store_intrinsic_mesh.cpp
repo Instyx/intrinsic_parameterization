@@ -3,6 +3,7 @@
 #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/rich_surface_mesh_data.h"
 #include <iomanip>
+#include <chrono>
 
 namespace gc = geometrycentral;
 
@@ -48,9 +49,17 @@ void store_intrinsic_edges(const DataGeo &data_mesh, const std::string filepath)
 }
 
 
-void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename){
+void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, Results &res){
+
+  auto start = std::chrono::high_resolution_clock::now();
   gcs::CommonSubdivision& cs = data_mesh.intTri->getCommonSubdivision();
   cs.constructMesh();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  res.cs_time = duration;
+  res.ext_vertex_count = cs.meshA.nVertices();
+  res.cs_vertex_count = cs.nVertices();
+  return;
 
   gcs::FaceData<double> faceIDs = niceColors(*data_mesh.intTri->intrinsicMesh, 7);
   auto data = cs.copyFromB(faceIDs);

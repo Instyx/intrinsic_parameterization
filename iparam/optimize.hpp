@@ -6,6 +6,9 @@
 
 struct Results{
   double init_time;
+  double cs_time;
+  int ext_vertex_count;
+  int cs_vertex_count;
   std::vector<double> energies;
   std::vector<int> flips;
   std::vector<int> flips_delaunay;
