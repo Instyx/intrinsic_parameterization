@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 #set(CMAKE_CXX_STANDARD 17)
 project(iparam)
+set(CMAKE_PREFIX_PATH "/usr/inlcude/suitesparse" ${CMAKE_PREFIX_PATH})
 
 # include(FetchContent)
 # FetchContent_Declare(
@@ -38,15 +39,16 @@ igl_include(glfw)
 igl_include(imgui)
 #igl_include(png)
 
-
+# find_package (SuiteSparse NO_MODULE)
+find_package(CHOLMOD REQUIRED)
 # Add your project files
 # file(GLOB SRC_FILES src/*.cpp)
 file(GLOB IPARAM_FILES iparam/*.cpp)
 file(GLOB IPARAM_HEADERS iparam/*.hpp)
 add_library(iparam_core STATIC ${IPARAM_FILES} ${IPARAM_HEADERS})
 add_library(predicates STATIC predicates.c)
-target_include_directories(iparam_core PUBLIC iparam)
-target_link_libraries(iparam_core PUBLIC igl::glfw igl::opengl igl::imgui geometry-central predicates)
+target_include_directories(iparam_core PUBLIC iparam ${CHOLMOD_INCLUDES})
+target_link_libraries(iparam_core PUBLIC igl::glfw igl::opengl igl::imgui geometry-central predicates SuiteSparse::CHOLMOD)
 
 add_executable(cli src/cli.cpp ${IPARAM_HEADERS})
 target_link_libraries(cli PUBLIC iparam_core)

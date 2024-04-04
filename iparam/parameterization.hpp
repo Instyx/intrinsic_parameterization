@@ -55,6 +55,7 @@ unsigned intrinsic_harmonic(DataGeo &data_mesh, Eigen::MatrixXd &UV, unsigned ma
 
 
 Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad);
+Eigen::MatrixXd tutte_ext(DataGeo &data_mesh);
 
 // these also saves inbetween meshes with textures
 

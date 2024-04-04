@@ -91,27 +91,27 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
       start = std::chrono::high_resolution_clock::now();
       UV_ext = harmonic(data_mesh, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
-      curr_energy = compute_total_energy(data_mesh, UV_ext, method, init_with_intrinsic);
+      curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
       break;
     }
     case EnergyType::ASAP:{
       start = std::chrono::high_resolution_clock::now();
       UV_ext = LSCM(data_mesh, true, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
-      curr_energy = compute_total_energy(data_mesh, UV_ext, method, init_with_intrinsic);
+      curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
       break;
     }
     case EnergyType::ARAP:{
       start = std::chrono::high_resolution_clock::now();
-      Eigen::MatrixXd UV_ext_init = tutte(data_mesh, init_with_intrinsic);
+      Eigen::MatrixXd UV_ext_init = tutte_ext(data_mesh);
       iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, max_iterations, true, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
-      curr_energy = compute_total_energy(data_mesh, UV_ext, method, init_with_intrinsic);
+      curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
       break;
     }
     case EnergyType::SYMMETRIC_DIRICHLET:{
       start = std::chrono::high_resolution_clock::now();
-      Eigen::MatrixXd UV_ext_init = tutte(data_mesh, init_with_intrinsic);
+      Eigen::MatrixXd UV_ext_init = tutte_ext(data_mesh);
       iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV_ext_init, 1000, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       UV_ext = slimdata.V_o;
@@ -154,7 +154,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     if (priority_queue_flips) {
       total_flips = priority_queue_flip(data_mesh, UV_iparam, total_del_flips, method);
     } else {
-      total_flips = queue_flip(data_mesh, UV_iparam, total_del_flips, method);
+      total_flips = edgeorder_flip(data_mesh, UV_iparam, total_del_flips, method);
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -165,7 +165,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
     if (total_flips == 0) {
       break;
     }
-    curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
+    curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
     res.energies.push_back(curr_energy);
     std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
     // Parametrize using new connectivity + Jacobians
@@ -175,14 +175,14 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
         start = std::chrono::high_resolution_clock::now();
         UV_iparam = harmonic(data_mesh, true);
         end = std::chrono::high_resolution_clock::now();
-        curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
+        curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
         break;
       }
       case EnergyType::ASAP:{
         start = std::chrono::high_resolution_clock::now();
         UV_iparam = LSCM(data_mesh, true, true);
         end = std::chrono::high_resolution_clock::now();
-        curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
+        curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
         break;
       }
       case EnergyType::ARAP:{
@@ -191,7 +191,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
         iterations = ARAP_tillconverges(data_mesh, UV_iparam, UV_new, max_iterations, true, true);
         end = std::chrono::high_resolution_clock::now();
         UV_iparam = UV_new;
-        curr_energy = compute_total_energy(data_mesh, UV_iparam, method, true);
+        curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
         break;
       }
       case EnergyType::SYMMETRIC_DIRICHLET:{

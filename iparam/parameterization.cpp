@@ -1,6 +1,8 @@
 #include "datageo.hpp"
 #include <iterator>
 #include <parameterization.hpp>
+#include "tutte.hpp"
+#include "adjacency.hpp"
 #include <igl/boundary_loop.h>
 #include <igl/map_vertices_to_circle.h>
 #include <igl/cotmatrix.h>
@@ -18,6 +20,7 @@
 #include <svd.hpp>
 #include <stdio.h>
 #include <chrono>
+#include <vector>
 
 
 // global variables for the boundary conditions
@@ -824,6 +827,25 @@ Eigen::MatrixXd tutte(DataGeo &data_mesh, bool igrad){
   return UV;
 }
 
+Eigen::MatrixXd tutte_ext(DataGeo &data_mesh){
+  Eigen::MatrixXd V = data_mesh.V;
+  Eigen::MatrixXi F = data_mesh.F;
+
+  Eigen::VectorXi VT, VTi;
+  Eigen::Matrix<int, -1, 3> TT;
+  Eigen::VectorXi VV, VVi;
+  Eigen::VectorXi B;
+
+  vt_adjacency(F, V, VT, VTi);
+  tt_adjacency(F, VT, VTi, TT);
+  vv_adjacency(F, V, TT, VV, VVi);
+  bdy_loop(F, TT, VT, VTi, B);
+
+  Eigen::Matrix<double, -1, 2> UV;
+  tutte(VV, VVi, B, UV, 0); 
+
+  return UV;
+}
 
 void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Eigen::Matrix2d &J){
   int i = 0;
@@ -869,6 +891,12 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
   if(et == EnergyType::ARAP) energy = arap;
   if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
 
+  Eigen::VectorXd areas_UV;
+
+  Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+  igl::doublearea(UV, F_new, areas_UV);
+  areas_UV/=2;
+
   double total_energy = 0;
   double total_area = 0;
   for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
@@ -876,11 +904,13 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
     Eigen::Matrix2d J;
     faceJacobian(data_mesh, UV, f, J);
     double curr_area = data_mesh.intTri->faceArea(f);
-    if(idx == 13227) std::cout << "idx " << idx << ":  " << curr_area << std::endl;
+    //if(idx == 13227) std::cout << "idx " << idx << ":  " << curr_area << std::endl;
     total_area += curr_area;
     total_energy += curr_area * energy(J);
   }
-  return total_energy/total_area;
+  double return_energy = total_energy/total_area;
+  if(et == EnergyType::ASAP) return_energy = std::abs(return_energy / areas_UV.sum());
+  return return_energy;
 
 }
 
