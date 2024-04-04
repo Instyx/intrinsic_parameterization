@@ -15,8 +15,9 @@ cA = (0.082, 0.463, 0.98)
 cB = (0.957, 0.733, 0.043)
 cC = (0.4, 0.4 , 0.44)
 
-mesh = None
-method = 0
+mesh = 222747
+mesh = 222694
+method = 3
 
 try:
     get_ipython().__class__.__name__
@@ -35,7 +36,7 @@ methods = ["dirichlet","asap","arap","symdirichlet"]
 flat = False
 meshes = sorted(glob.glob(f"{output_folder}/*/"))
 
-i = 20
+i = 0
 if mesh:
     try:
         i = meshes.index(f"{output_folder}/{mesh}/")
@@ -84,35 +85,53 @@ def update_param():
         s.ps_i_mesh.set_enabled(False)
         s.ps_e_mesh.set_enabled(True)
 
+def load_inbetween():
+    global s
+    id = Path(meshes[s.i]).stem
+
+    s.i_mesh = loader.create_intrinsic_mesh(Path(s.inbetweens[s.inbetween%len(s.inbetweens)]).parent, id+f"_{1+s.inbetween%len(s.inbetweens)}")
+    s.i_mesh.V -= s.mean
+    s.i_mesh.V /= s.scaling
+    s.i_mesh.eV -= s.mean
+    s.i_mesh.eV /= s.scaling
+    s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
+    s.ps_i_mesh.set_enabled(not s.intrisic)
+    s.ps_i_ogedges.set_enabled(False)
+    s.ps_i_edges.set_enabled(False)
+    s.ps_e_mesh.set_enabled(s.intrisic)
 
 def update_meshes():
     global s
-    id = Path(meshes[s.i]).stem
+    id = Path(meshes[s.i]).name
     print(id, methods[s.method])
     def add_mesh():
         global s
-        s.e_mesh = meshio.read(f"{output_folder}/{id}/{methods[s.method]}/{id}_ext.obj")
+        try:
+            s.e_mesh = meshio.read(f"{output_folder}/{id}/{methods[s.method]}/{id}_ext.obj")
 
-        V = s.e_mesh.points
-        mean = V.mean(axis=0)
-        V -= mean
-        scaling = max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
-        V /= scaling
-        F = s.e_mesh.cells[0].data
+            s.inbetweens = sorted(glob.glob(f"{output_folder}/{id}/{methods[s.method]}/inbetween/*.obj"))
+            V = s.e_mesh.points
+            s.mean = V.mean(axis=0)
+            V -= s.mean
+            s.scaling = max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+            V /= s.scaling
+            F = s.e_mesh.cells[0].data
 
-        s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=cC, edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
-        s.ps_e_mesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
-                                           coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
+            s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=cC, edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
+            s.ps_e_mesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
+                                               coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
 
-        s.i_mesh = loader.create_intrinsic_mesh(f"{output_folder}/{id}/{methods[s.method]}/", id)
-        s.i_mesh.V -= mean
-        s.i_mesh.V /= scaling
-        s.i_mesh.eV -= mean
-        s.i_mesh.eV /= scaling
-        s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
-        s.ps_i_mesh.set_enabled(s.intrisic)
-        s.ps_i_ogedges.set_enabled(False)
-        s.ps_i_edges.set_enabled(False)
+            s.i_mesh = loader.create_intrinsic_mesh(f"{output_folder}/{id}/{methods[s.method]}/", id)
+            s.i_mesh.V -= s.mean
+            s.i_mesh.V /= s.scaling
+            s.i_mesh.eV -= s.mean
+            s.i_mesh.eV /= s.scaling
+            s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
+            s.ps_i_mesh.set_enabled(s.intrisic)
+            s.ps_i_ogedges.set_enabled(False)
+            s.ps_i_edges.set_enabled(False)
+        except:
+            return
     add_mesh()
 
 toggle = True
@@ -120,6 +139,7 @@ def callback():
     global s
     psim.Text(f"Mesh {Path(meshes[s.i]).stem}");
     psim.Text(f"Method {methods[s.method]}");
+    psim.Text(f"Inbetweens {s.inbetween+1}/{len(s.inbetweens)}");
     if toggle:
         psim.Text(f"using normal parametrization");
     else:
@@ -167,6 +187,16 @@ def callback():
         s.intrinsic = not s.intrinsic
         update_param()
     elif (psim.IsKeyPressed(ord("q")) or psim.IsKeyPressed(ord("Q"))):
+        s.inbetween = 0
+        load_inbetween()
+        pass
+    elif (psim.IsKeyPressed(ord("x")) or psim.IsKeyPressed(ord("X"))):
+        s.inbetween += 1
+        load_inbetween()
+        pass
+    elif (psim.IsKeyPressed(ord("c")) or psim.IsKeyPressed(ord("C"))):
+        s.inbetween -= 1
+        load_inbetween()
         pass
         # flat = not flat
         # newView = ps.get_view_as_json()
@@ -179,6 +209,7 @@ def callback():
 # state
 s = loader.dotdict(
     oldView = ps.get_view_as_json(),
+    inbetweens = [],
     intrinsic = False,
     method = method,
     i = i,
@@ -188,6 +219,9 @@ s = loader.dotdict(
     ps_i_mesh = None,
     ps_i_edges = None,
     ps_i_ogedges = None,
+    scaling = 1,
+    mean = 0,
+    inbetween = -1
 )
 update_meshes()
 update_param()
@@ -195,3 +229,4 @@ ps.reset_camera_to_home_view()
 s.oldView = ps.get_view_as_json()
 ps.set_user_callback(callback)
 ps.show();
+ps.set_view_as_json('{"farClipRatio":20.0,"fov":45.0,"nearClipRatio":0.005,"projectionMode":"Perspective","viewMat":[0.998307824134827,4.51109372079372e-10,0.0582015477120876,0.142758846282959,0.0528025701642036,0.420612096786499,-0.905706703662872,0.147499889135361,-0.0244811680167913,0.907244563102722,0.419898748397827,-0.338649749755859,0.0,0.0,0.0,1.0],"windowHeight":1084,"windowWidth":1099}')

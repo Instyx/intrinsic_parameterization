@@ -35,3 +35,7 @@ output/*
 output_bak/*
 thingi_data/*
 test_data/*
+**/.ccls-cache/*
+cutted/
+old/
+output_*
