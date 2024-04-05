@@ -38,6 +38,7 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
 // boundary constraints are stored as static variables, for the purpose of testing this resets the static variables
 void reset_constraints();
 
+void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Eigen::Matrix2d &J);
 
 unsigned ARAP_tillconverges(DataGeo &data_mesh, const Eigen::MatrixXd &UV_init, Eigen::MatrixXd &UV, unsigned max_iterations, bool isFreeBoundary, bool igrad, double& curr_energy);
 
