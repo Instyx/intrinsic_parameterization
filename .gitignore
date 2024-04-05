@@ -39,3 +39,4 @@ test_data/*
 cutted/
 old/
 output_*
+__pycache__/
