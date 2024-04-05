@@ -57,3 +57,9 @@ target_compile_options(cli PRIVATE -O3)
 add_executable(${PROJECT_NAME} src/main.cpp ${IPARAM_HEADERS})
 target_link_libraries(${PROJECT_NAME} PUBLIC iparam_core)
 target_compile_options(${PROJECT_NAME} PRIVATE -O3)
+
+add_executable(filter src/filter.cpp ${IPARAM_HEADERS})
+target_link_libraries(filter PUBLIC iparam_core)
+target_compile_options(filter PRIVATE -O3)
+
+
