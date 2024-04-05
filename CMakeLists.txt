@@ -10,6 +10,7 @@ set(CMAKE_DEBUG_POSTFIX d)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 
 set(IPARAM_EXTERNAL_DIR "external")
 
@@ -68,4 +69,3 @@ add_subdirectory(apps)
 
 # The executable python binding code is here
 add_subdirectory(python)
-
