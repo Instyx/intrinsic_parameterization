@@ -1,0 +1,232 @@
+#!/usr/bin/env python
+import numpy as np
+import meshio
+import polyscope as ps
+import polyscope.imgui as psim
+import sys
+import glob
+from pathlib import Path
+import loader
+
+output_folder = "output"
+
+cblack = (0.0, 0.0, 0.0)
+cA = (0.082, 0.463, 0.98)
+cB = (0.957, 0.733, 0.043)
+cC = (0.4, 0.4 , 0.44)
+
+mesh = 222747
+mesh = 222694
+method = 3
+
+try:
+    get_ipython().__class__.__name__
+except:
+    try:
+        mesh = sys.argv[1]
+    except:
+        pass
+    try:
+        method = sys.argv[2]
+    except:
+        pass
+
+
+methods = ["dirichlet","asap","arap","symdirichlet"]
+flat = False
+meshes = sorted(glob.glob(f"{output_folder}/*/"))
+
+i = 0
+if mesh:
+    try:
+        i = meshes.index(f"{output_folder}/{mesh}/")
+    except:
+        pass
+
+
+
+
+ps.init()
+#ps.load_blendable_material("myflat", ["../textures/texturered.png","../textures/texturegreen.png","../textures/texture.png","../textures/textureblack.png"]);
+ps.set_ground_plane_mode("none");
+ps.set_SSAA_factor(2)
+
+paramesh = None
+def update_param():
+    global s
+    # if flat:
+    #     ps.set_navigation_style("planar")
+    #     s.ps_e_mesh.set_enabled(False)
+    #     s.ps_i_mesh.set_enabled(False)
+    #     if toggle:
+    #         V = iparam_mesh.point_data["obj:vt"]
+    #     else:
+    #         V = s.e_mesh.point_data["obj:vt"]
+    #     F = s.e_mesh.cells[0].data
+    #     V -= V.mean(axis=0)
+    #     V = V/max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+    #     paramesh = ps.register_surface_mesh("ParaMesh", V, F, material="clay", color=(152/255,152/255,152/255), edge_color=(0,0,0), edge_width=1, enabled=True);
+    #     # x = (V[:,0].max()-V[:,0].min())/2 + V[:,0].min()
+    #     # y = (V[:,1].max()-V[:,1].min())/2 + V[:,1].min()
+    #
+    # else:
+    #     ps.set_navigation_style("turntable")
+    #     if paramesh:
+    #         paramesh.set_enabled(False)
+    #     psmesh.set_enabled()
+    if s.intrinsic:
+        s.ps_i_mesh.set_enabled(True)
+        s.ps_e_mesh.set_enabled(False)
+        # psmesh.add_parameterization_quantity("Intrinsic", iparam_mesh.point_data["obj:vt"], defined_on="vertices",
+        #     coords_type="unit", viz_style="checker",checker_colors=(cblack, cA), checker_size=0.05, enabled=False)
+        # psmesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
+        #                                    coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
+    else:
+        s.ps_i_mesh.set_enabled(False)
+        s.ps_e_mesh.set_enabled(True)
+
+def load_inbetween():
+    global s
+    id = Path(meshes[s.i]).stem
+
+    s.i_mesh = loader.create_intrinsic_mesh(Path(s.inbetweens[s.inbetween%len(s.inbetweens)]).parent, id+f"_{1+s.inbetween%len(s.inbetweens)}")
+    s.i_mesh.V -= s.mean
+    s.i_mesh.V /= s.scaling
+    s.i_mesh.eV -= s.mean
+    s.i_mesh.eV /= s.scaling
+    s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
+    s.ps_i_mesh.set_enabled(not s.intrisic)
+    s.ps_i_ogedges.set_enabled(False)
+    s.ps_i_edges.set_enabled(False)
+    s.ps_e_mesh.set_enabled(s.intrisic)
+
+def update_meshes():
+    global s
+    id = Path(meshes[s.i]).name
+    print(id, methods[s.method])
+    def add_mesh():
+        global s
+        try:
+            s.e_mesh = meshio.read(f"{output_folder}/{id}/{methods[s.method]}/{id}_ext.obj")
+
+            s.inbetweens = sorted(glob.glob(f"{output_folder}/{id}/{methods[s.method]}/inbetween/*.obj"))
+            V = s.e_mesh.points
+            s.mean = V.mean(axis=0)
+            V -= s.mean
+            s.scaling = max([V[:,0].max()-V[:,0].min(),V[:,1].max()-V[:,1].min()])
+            V /= s.scaling
+            F = s.e_mesh.cells[0].data
+
+            s.ps_e_mesh = ps.register_surface_mesh("Normal", V, F, material="clay", color=cC, edge_color=(0,0,0), edge_width=0, enabled=s.intrinsic);
+            s.ps_e_mesh.add_parameterization_quantity("Normal", s.e_mesh.point_data["obj:vt"], defined_on="vertices",
+                                               coords_type="unit", viz_style="checker",checker_colors=(cblack, cB), checker_size=0.05, enabled=True)
+
+            s.i_mesh = loader.create_intrinsic_mesh(f"{output_folder}/{id}/{methods[s.method]}/", id)
+            s.i_mesh.V -= s.mean
+            s.i_mesh.V /= s.scaling
+            s.i_mesh.eV -= s.mean
+            s.i_mesh.eV /= s.scaling
+            s.ps_i_mesh, s.ps_i_ogedges, s.ps_i_edges = loader.render_intrinsic_mesh("Intrinsic", s.i_mesh)
+            s.ps_i_mesh.set_enabled(s.intrisic)
+            s.ps_i_ogedges.set_enabled(False)
+            s.ps_i_edges.set_enabled(False)
+        except:
+            return
+    add_mesh()
+
+toggle = True
+def callback():
+    global s
+    psim.Text(f"Mesh {Path(meshes[s.i]).stem}");
+    psim.Text(f"Method {methods[s.method]}");
+    psim.Text(f"Inbetweens {s.inbetween+1}/{len(s.inbetweens)}");
+    if toggle:
+        psim.Text(f"using normal parametrization");
+    else:
+        psim.Text(f"using intrinsic parametrization");
+    psim.Text(f"------------------------");
+    psim.Text(f"Change Mesh using 'a' and 'd'");
+    psim.Text(f"Change Method using 's' and 'w' or '1','2','3','4'");
+    psim.Text(f"Switch parameterization with SPACE");
+    psim.Text(f"Switch parameterization view with 'q'");
+    if (psim.IsKeyPressed(ord("l")) or psim.IsKeyPressed(ord("L")) or psim.IsKeyPressed(ord("d")) or psim.IsKeyPressed(ord("D"))):
+        s.i = (s.i+1)%len(meshes)
+        update_meshes()
+        update_param()
+        ps.reset_camera_to_home_view()
+    elif (psim.IsKeyPressed(ord("h")) or psim.IsKeyPressed(ord("H")) or psim.IsKeyPressed(ord("a"))or psim.IsKeyPressed(ord("A"))):
+        s.i = (s.i-1)%len(meshes)
+        update_meshes()
+        update_param()
+        ps.reset_camera_to_home_view()
+    elif (psim.IsKeyPressed(ord("j")) or psim.IsKeyPressed(ord("J")) or psim.IsKeyPressed(ord("w")) or psim.IsKeyPressed(ord("W"))):
+        s.method = (s.method+1)%len(methods)
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord("k")) or psim.IsKeyPressed(ord("K")) or psim.IsKeyPressed(ord("s")) or psim.IsKeyPressed(ord("S"))):
+        s.method = (s.method-1)%len(methods)
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord("1"))):
+        s.method = 0
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord("2"))):
+        s.method = 1
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord("3"))):
+        s.method = 2
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord("4"))):
+        s.method = 3
+        update_meshes()
+        update_param()
+    elif (psim.IsKeyPressed(ord(" "))):
+        s.intrinsic = not s.intrinsic
+        update_param()
+    elif (psim.IsKeyPressed(ord("q")) or psim.IsKeyPressed(ord("Q"))):
+        s.inbetween = 0
+        load_inbetween()
+        pass
+    elif (psim.IsKeyPressed(ord("x")) or psim.IsKeyPressed(ord("X"))):
+        s.inbetween += 1
+        load_inbetween()
+        pass
+    elif (psim.IsKeyPressed(ord("c")) or psim.IsKeyPressed(ord("C"))):
+        s.inbetween -= 1
+        load_inbetween()
+        pass
+        # flat = not flat
+        # newView = ps.get_view_as_json()
+        # ps.set_view_from_json(oldView)
+        # oldView = newView
+        # update_param()
+    else:
+        return
+
+# state
+s = loader.dotdict(
+    oldView = ps.get_view_as_json(),
+    inbetweens = [],
+    intrinsic = False,
+    method = method,
+    i = i,
+    e_mesh = None,
+    ps_e_mesh = None,
+    i_mesh = None,
+    ps_i_mesh = None,
+    ps_i_edges = None,
+    ps_i_ogedges = None,
+    scaling = 1,
+    mean = 0,
+    inbetween = -1
+)
+update_meshes()
+update_param()
+ps.reset_camera_to_home_view()
+s.oldView = ps.get_view_as_json()
+ps.set_user_callback(callback)
+ps.show();
+ps.set_view_as_json('{"farClipRatio":20.0,"fov":45.0,"nearClipRatio":0.005,"projectionMode":"Perspective","viewMat":[0.998307824134827,4.51109372079372e-10,0.0582015477120876,0.142758846282959,0.0528025701642036,0.420612096786499,-0.905706703662872,0.147499889135361,-0.0244811680167913,0.907244563102722,0.419898748397827,-0.338649749755859,0.0,0.0,0.0,1.0],"windowHeight":1084,"windowWidth":1099}')
