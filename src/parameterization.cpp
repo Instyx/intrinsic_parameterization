@@ -547,7 +547,7 @@ Eigen::MatrixXd LSCM(DataGeo &data_mesh, bool isFreeBoundary, bool igrad){
   Eigen::MatrixXd UV;
 	UV.resize(V.rows(),2);
 	UV.col(0) = x.segment(0,V.rows());
- 	UV.col(1) = x.segment(V.rows(),V.rows());
+ 	UV.col(1) = -x.segment(V.rows(),V.rows());
   return UV;
 }
 
@@ -842,7 +842,7 @@ Eigen::MatrixXd tutte_ext(DataGeo &data_mesh){
   bdy_loop(F, TT, VT, VTi, B);
 
   Eigen::Matrix<double, -1, 2> UV;
-  tutte(VV, VVi, B, UV, 0); 
+  tutte(VV, VVi, B, UV, 0);
 
   return UV;
 }
