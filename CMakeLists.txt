@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.16..3.21)
 project(iparam)
 
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
 # Configure general CMake variables
 set(CMAKE_DEBUG_POSTFIX d)
 
@@ -11,6 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(IPARAM_EXTERNAL_DIR "external")
 
@@ -36,6 +36,7 @@ add_subdirectory(${IPARAM_EXTERNAL_DIR}/libigl)
 
 igl_include(glfw)
 igl_include(imgui)
+igl_include(copyleft cgal)
 
 # Add Cholmod
 find_package(SuiteSparse REQUIRED)

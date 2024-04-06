@@ -7,5 +7,5 @@ target_link_libraries(main PUBLIC iparam_core)
 target_compile_options(main PRIVATE -O3)
 
 add_executable(filter filter.cpp)
-target_link_libraries(filter PUBLIC iparam_core)
-target_compile_options(filter PRIVATE -O3)
+target_link_libraries(filter PUBLIC iparam_core igl_copyleft::cgal)
+target_compile_options(filter PRIVATE -O3 )
