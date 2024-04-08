@@ -33,10 +33,14 @@ void vv_adjacency(const Eigen::Ref< const Eigen::Matrix<int,-1,3> > F,
                   Eigen::VectorXi & VV,
                   Eigen::VectorXi & VVi);
 
-bool bdy_loop(const Eigen::Ref< Eigen::Matrix<int,-1,3> > F,
-              const Eigen::Ref< Eigen::Matrix<int,-1,3> > TT,
-              const Eigen::Ref< Eigen::VectorXi > VT,
-              const Eigen::Ref< Eigen::VectorXi > VTi,
+bool bdy_loop(const Eigen::Ref< const Eigen::Matrix<int,-1,3> > F,
+              const Eigen::Ref< const Eigen::Matrix<int,-1,3> > TT,
+              const Eigen::Ref< const Eigen::VectorXi > VT,
+              const Eigen::Ref< const Eigen::VectorXi > VTi,
+              Eigen::VectorXi &B);
+
+bool bdy_loop(const Eigen::Ref<const Eigen::Matrix<int,-1,3> > F,
+              const Eigen::Ref<const Eigen::Matrix<double,-1,3> > V,
               Eigen::VectorXi &B);
 
 #define FHE(X, Y)  (X*3+Y)

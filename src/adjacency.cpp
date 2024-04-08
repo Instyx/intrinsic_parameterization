@@ -165,11 +165,23 @@ void he_adjacency(const Eigen::Ref< const Eigen::Matrix<int,-1,3> > F,
     }
 }
 
+bool bdy_loop(const Eigen::Ref<const Eigen::Matrix<int,-1,3> > F,
+              const Eigen::Ref<const Eigen::Matrix<double,-1,3> > V,
+              Eigen::VectorXi &B){
+  Eigen::VectorXi VT, VTi;
+  Eigen::Matrix<int, -1, 3> TT;
+  Eigen::VectorXi VV, VVi;
+  vt_adjacency(F, V, VT, VTi);
+  tt_adjacency(F, VT, VTi, TT);
+  vv_adjacency(F, V, TT, VV, VVi);
+  return bdy_loop(F, TT, VT, VTi, B);
+}
+
 // generate an (ordered) list of boundary vertices
-bool bdy_loop(const Eigen::Ref< Eigen::Matrix<int,-1,3> > F,
-              const Eigen::Ref< Eigen::Matrix<int,-1,3> > TT,
-              const Eigen::Ref< Eigen::VectorXi > VT,
-              const Eigen::Ref< Eigen::VectorXi > VTi,
+bool bdy_loop(const Eigen::Ref<const Eigen::Matrix<int,-1,3> > F,
+              const Eigen::Ref<const Eigen::Matrix<int,-1,3> > TT,
+              const Eigen::Ref<const Eigen::VectorXi > VT,
+              const Eigen::Ref<const Eigen::VectorXi > VTi,
               Eigen::VectorXi &B)
 {
 

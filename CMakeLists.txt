@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.16..3.21)
 
 project(iparam)
 
+# Path definitions:
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(IPARAM_EXTERNAL_DIR "external")
 # Configure general CMake variables
 set(CMAKE_DEBUG_POSTFIX d)
 
@@ -12,7 +14,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(IPARAM_EXTERNAL_DIR "external")
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  endif()
+endif()
 
 
 if (WIN32)
@@ -23,17 +29,24 @@ if (WIN32)
 	add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
 endif()
 
+include(FetchContent)
+
+## Add Polyscope
+#FetchContent_Declare(
+#  polyscope
+#  GIT_REPOSITORY https://github.com/nmwsharp/polyscope.git
+#  GIT_TAG master
+#  GIT_SHALLOW TRUE
+#  GIT_PROGRESS TRUE)
+#FetchContent_MakeAvailable(polyscope)
+
+
 # Add Geometry Central
 add_subdirectory(${IPARAM_EXTERNAL_DIR}/geometry-central)
 
 # Add libigl
-option(LIBIGL_GLFW         "Build target igl::glfw"         ON)
-option(LIBIGL_IMGUI        "Build target igl::imgui"        ON)
-option(LIBIGL_OPENGL       "Build target igl::opengl"       ON)
-#option(LIBIGL_PNG          "Build target igl::png"          ON)
 
 add_subdirectory(${IPARAM_EXTERNAL_DIR}/libigl)
-
 igl_include(glfw)
 igl_include(imgui)
 igl_include(copyleft cgal)
