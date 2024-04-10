@@ -884,12 +884,12 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
 double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
 
   data_mesh.intTri->requireFaceIndices();
-  double (*energy)(Eigen::Matrix2d);
+  double (*energy)(const Eigen::Matrix2d &);
 
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  if(et == EnergyType::DIRICHLET) energy = &dirichlet;
+  if(et == EnergyType::ASAP) energy = &asap;
+  if(et == EnergyType::ARAP) energy = &arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = &symmetric_dirichlet;
 
   Eigen::VectorXd areas_UV;
 
@@ -918,12 +918,12 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
 double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Eigen::SparseMatrix<double> &Dx,
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et){
 
-  double (*energy)(Eigen::Matrix2d);
+  double (*energy)(const Eigen::Matrix2d &);
 
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  if(et == EnergyType::DIRICHLET) energy = &dirichlet;
+  if(et == EnergyType::ASAP) energy = &asap;
+  if(et == EnergyType::ARAP) energy = &arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = &symmetric_dirichlet;
 
   Eigen::VectorXd Dxu = Dx * UV.col(0);
   Eigen::VectorXd Dxv = Dx * UV.col(1);
@@ -944,12 +944,12 @@ double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, 
 // USE THIS FOR COMPUTING TOTAL ENERGY
 double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, bool igrad){
 
-  double (*energy)(Eigen::Matrix2d);
+  double (*energy)(const Eigen::Matrix2d &);
 
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  if(et == EnergyType::DIRICHLET) energy = &dirichlet;
+  if(et == EnergyType::ASAP) energy = &asap;
+  if(et == EnergyType::ARAP) energy = &arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = &symmetric_dirichlet;
   Eigen::VectorXd areas, areas_UV;
   Eigen::SparseMatrix<double> Dx, Dy;
   if(igrad){
@@ -989,6 +989,8 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   for(int i=0;i<data_mesh.intTri->intrinsicMesh->nFaces();++i){
     Eigen::Matrix2d J;
 		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
+    if (i==10)
+      std::cout << J << "\n";
     double temp = energy(J)*areas(i);
     if(std::isnan(temp))
       std::cout << " Nan found in Jacobian: " << J << std::endl;
@@ -1003,12 +1005,12 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
 
 double compute_energy_ext(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &UV, const EnergyType &et){
 
-  double (*energy)(Eigen::Matrix2d);
+  double (*energy)(const Eigen::Matrix2d &);
 
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+  if(et == EnergyType::DIRICHLET) energy = &dirichlet;
+  if(et == EnergyType::ASAP) energy = &asap;
+  if(et == EnergyType::ARAP) energy = &arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = &symmetric_dirichlet;
 
   Eigen::VectorXd areas;
   Eigen::SparseMatrix<double> Dx, Dy;

@@ -6,29 +6,29 @@ Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt, unsigned nvertices){
   result.resize(nvertices);
   if (pt.type == gcs::SurfacePointType::Vertex){
     result.insert(pt.vertex.getIndex()) = 1;
-  } 
-  else { 
+  }
+  else {
     result.insert(pt.edge.firstVertex().getIndex()) = (1-pt.tEdge);
     result.insert(pt.edge.secondVertex().getIndex()) = pt.tEdge;
   }
   return result;
 }
 
-double subdivide(const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, std::vector<gcs::SurfacePoint>& vec1, std::vector<gcs::SurfacePoint>& vec2, 
+double subdivide(const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, std::vector<gcs::SurfacePoint>& vec1, std::vector<gcs::SurfacePoint>& vec2,
     double len1, double len2, double len3,bool complete, Eigen::MatrixXd &J, Eigen::VectorXd &areas){
 
   unsigned nvertices = V.rows();
   Eigen::Matrix2d E, E_tilde;
-  double temp = (len3*len3 - len1*len1 - len2*len2)/(-2*len1); 
+  double temp = (len3*len3 - len1*len1 - len2*len2)/(-2*len1);
   E_tilde << len1, temp, 0 , sqrt(len2*len2 - temp*temp);
-  
+
   //subdivided triangle size
   int face_size = 1 + (vec2.size()-2)*2;
   if(complete){
-    face_size += vec1.size() - vec2.size(); 
+    face_size += vec1.size() - vec2.size();
   }
 
-  J.resize(face_size*2,2); 
+  J.resize(face_size*2,2);
   areas.resize(face_size);
 
   int i=0;
@@ -43,7 +43,7 @@ double subdivide(const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, std::vecto
   Eigen::Vector2d edgevec_before1 = seg_len1/len1 * E_tilde.col(0);
   Eigen::Vector2d edgevec_before2 = seg_len2/len2 * E_tilde.col(1);
 
-  // add first triangle 
+  // add first triangle
   EE_tilde << edgevec_before1, edgevec_before2;
   EE << UV.transpose()*(b(vec1[i+1], nvertices)-b(vec1[i], nvertices)), UV.transpose()*(b(vec2[j+1], nvertices)-b(vec1[i], nvertices));
   J.block(0,0,2,2) << EE * EE_tilde.inverse();
@@ -95,15 +95,15 @@ double subdivide(const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, std::vecto
 bool compareVectors(const std::pair<std::vector<gcs::SurfacePoint>, double >& a, const std::pair<std::vector<gcs::SurfacePoint>, double >& b) {
     return a.first.size() < b.first.size();
 }
-  
-double calc_energy(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, gcs::Halfedge he, const EnergyType &et){
-  
-  double (*energy)(Eigen::Matrix2d);
 
-  if(et == EnergyType::DIRICHLET) energy = dirichlet;
-  if(et == EnergyType::ASAP) energy = asap;
-  if(et == EnergyType::ARAP) energy = arap;
-  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
+double calc_energy(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::MatrixXd &UV, gcs::Halfedge he, const EnergyType &et){
+
+  double (*energy)(const Eigen::Matrix2d &);
+
+  if(et == EnergyType::DIRICHLET) energy = &dirichlet;
+  if(et == EnergyType::ASAP) energy = &asap;
+  if(et == EnergyType::ARAP) energy = &arap;
+  if(et == EnergyType::SYMMETRIC_DIRICHLET) energy = &symmetric_dirichlet;
 
 
   gcs::Halfedge he1 = he;
@@ -116,7 +116,7 @@ double calc_energy(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::Ma
   vec[0].second = data_mesh.intTri->edgeLengths[he1.edge()];
   vec[1].second = data_mesh.intTri->edgeLengths[he2.edge()];
   vec[2].second = data_mesh.intTri->edgeLengths[he3.edge()];
-  
+
   // sort the intrinsic edges w.r.t. their number of middlepoints
   std::sort(vec.begin(), vec.end(), compareVectors);
 
@@ -145,8 +145,8 @@ double calc_energy(DataGeo &data_mesh, const Eigen::MatrixXd &V, const Eigen::Ma
   std::reverse(vec[2].first.begin(), vec[2].first.end());
   if(vec[2].first.size()!=vec[1].first.size()){
     std::vector<gcs::SurfacePoint> new_seg(vec[2].first.begin(),vec[2].first.begin()+vec[2].first.size()-vec[1].first.size()+1);
-  
-    if(new_seg.size()>vec[0].first.size()){ 
+
+    if(new_seg.size()>vec[0].first.size()){
       subdivide(V, UV, new_seg, vec[0].first, new_seglen, vec[0].second, len3, true, J, areas);
     }
     else{
@@ -172,8 +172,8 @@ unsigned flipThroughEdges(DataGeo &data_mesh, const Eigen::MatrixXd V, const Eig
     data_mesh.intTri->flipEdgeIfPossible(e);
     h1= e.halfedge();
     h2= h1.twin();
-    double after = calc_energy(data_mesh, V, UV, h1, et)+ calc_energy(data_mesh, V, UV, h2, et); 
-    double tolerance = 1e-6; // set tolerance to 1e-6 
+    double after = calc_energy(data_mesh, V, UV, h1, et)+ calc_energy(data_mesh, V, UV, h2, et);
+    double tolerance = 1e-6; // set tolerance to 1e-6
 
     if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
       if (before > after) {
@@ -187,7 +187,6 @@ unsigned flipThroughEdges(DataGeo &data_mesh, const Eigen::MatrixXd V, const Eig
       data_mesh.intTri->flipEdgeIfPossible(e);
     }
   }
-    
+
   return totalflips;
 }
-
