@@ -87,6 +87,52 @@ void lscm(
   const Eigen::MatrixXi& F,
   const Eigen::MatrixXd& V,
   const Eigen::SparseMatrix<double>& L,
+  int fixed1,
+  int fixed2,
+  Eigen::MatrixXd& UV
+){
+  const int nV = V.rows();
+
+  Eigen::VectorXi boundary;
+  bdy_loop(F, V, boundary);
+
+  Eigen::SparseMatrix<double> A;
+  vector_area_matrix(V, boundary, A);
+
+  // Assemble the cotan laplacian matrix
+  Eigen::SparseMatrix<double> L_flat;
+  igl::repdiag(L,2,L_flat);
+  Eigen::SparseMatrix<double> Q;
+  Q = L_flat - 2.*A;
+
+  Eigen::VectorXi B;
+  B.resize(4);
+
+  Eigen::MatrixXd X;
+
+  X.resize(nV*2,1);
+  // igl::boundary_loop(F, boundary);
+  B(0) = fixed1;
+  B(1) = fixed2;
+  B(2) = fixed1+nV;
+  B(3) = fixed2+nV;
+  X(B(0)) = 1;
+  X(B(0)+nV) = 0;
+  X(B(1)) = 0;
+  X(B(1)+nV) = 1;
+  solve_with_known_try_cholmod(Q, B, X);
+  UV.resize(nV,2);
+  for (unsigned i=0;i<UV.cols();++i)
+  {
+    UV.col(i) = X.block(nV*i,0,nV,1);
+  }
+}
+
+
+void lscm(
+  const Eigen::MatrixXi& F,
+  const Eigen::MatrixXd& V,
+  const Eigen::SparseMatrix<double>& L,
   const Eigen::Matrix<double,-1,2>& UV_init,
   Eigen::Matrix<double, -1,2>& UV
 ){

@@ -112,10 +112,12 @@ void solve_with_known_gauss_seidel(
 
     gauss_seidel(A, b, x);
      
+
     row = 0;
     for (int i = 0; i < nv; i++)
         if (idx[i] >= 0)
             X.row(i) = x.row(row++);
+
 }
 
 template <typename Derived>

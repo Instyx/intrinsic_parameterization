@@ -34,7 +34,7 @@ bool gauss_seidel_tillconverges(const Eigen::SparseMatrix<T> &A, const Eigen::Ma
     Eigen::Matrix<typename DerivedX::Scalar, DerivedX::RowsAtCompileTime, DerivedX::ColsAtCompileTime> X_old = X;
     int iter = 0;
     double tol = 1e-6;
-    double rel_tol = 1e-6;
+    double rel_tol = 1e-4;
     do{
         X_old = X;
         // currently works only for symmetric matrices
@@ -48,8 +48,9 @@ bool gauss_seidel_tillconverges(const Eigen::SparseMatrix<T> &A, const Eigen::Ma
             X.row(oIdx) = (B.row(oIdx) - sum) / A.coeff(oIdx, oIdx);
         }
         ++iter;
-    }while(iter < 1000 && (X-X_old).norm() > tol && (X-X_old).norm()/X_old.norm() > rel_tol);
-
+    }while(iter < 100 && (X-X_old).norm() > tol && (X-X_old).norm()/X_old.norm() > rel_tol);
+    std::cout << std::endl;
+    std::cout << "gs converged in " <<iter << " iterations" << std::endl;
     return true;
 }
 

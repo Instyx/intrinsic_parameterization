@@ -5,7 +5,7 @@
 #include "test.hpp"
 #include <filesystem>
 #include <igl/face_areas.h>
-#include "optimize.hpp"
+#include "optimize_new.hpp"
 
 int main(int argc, char *argv[]) {
   // evaluation
@@ -44,16 +44,16 @@ if(argc < 4) {
   Results res;
   if (method == "dirichlet"){
     // test_Dirichlet_single(V, F, outdir, filename, std::cout);
-    res = optimize_single(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue);
+    res = optimize_single_new(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue);
   } else if (method == "arap"){
     // test_ARAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ARAP, outdir, filename, start, queue);
+    res = optimize_single_new(V, F, EnergyType::ARAP, outdir, filename, start, queue);
   } else if (method == "asap"){
     // test_ASAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single(V, F, EnergyType::ASAP, outdir, filename, start, queue);
+    res = optimize_single_new(V, F, EnergyType::ASAP, outdir, filename, start, queue);
   } else if (method == "symdirichlet"){
     // test_SymDirichlet_single(V, F, outdir, filename, log);
-    res = optimize_single(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue);
+    res = optimize_single_new(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue);
   } else {
     std::cout << "Method '" << method << "' is unknown." << std::endl;
     return 1;

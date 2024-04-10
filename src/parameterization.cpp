@@ -989,8 +989,6 @@ double compute_total_energy(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const
   for(int i=0;i<data_mesh.intTri->intrinsicMesh->nFaces();++i){
     Eigen::Matrix2d J;
 		J << Dxu(i), Dyu(i), Dxv(i), Dyv(i);
-    if (i==10)
-      std::cout << J << "\n";
     double temp = energy(J)*areas(i);
     if(std::isnan(temp))
       std::cout << " Nan found in Jacobian: " << J << std::endl;
