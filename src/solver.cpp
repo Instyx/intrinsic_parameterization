@@ -178,10 +178,12 @@ void solve_with_known_cholmod(const Eigen::SparseMatrix<double> &L, const Eigen:
   solve_with_known(L, known, solver, X);
 }
 
+
 void solve_with_known_cholmod(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, Eigen::Matrix<double,-1,2> &X){
   Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>> solver;
   solve_with_known(L, known, solver, X);
 }
+
 
 void solve_with_known_lu(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, Eigen::MatrixXd &X){
   Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;

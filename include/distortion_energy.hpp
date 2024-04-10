@@ -9,8 +9,8 @@ enum class EnergyType{
 };
 
 // distortion energies
-double dirichlet(Eigen::Matrix2d J);
-double asap(Eigen::Matrix2d J);
-double arap(Eigen::Matrix2d J);
-double symmetric_dirichlet(Eigen::Matrix2d J);
-double symmetric_dirichlet_alt(Eigen::Matrix2d J);
+double dirichlet(const Eigen::Matrix2d &J);
+double asap(const Eigen::Matrix2d &J);
+double arap(const Eigen::Matrix2d &J);
+double symmetric_dirichlet(const Eigen::Matrix2d &J);
+double symmetric_dirichlet_alt(const Eigen::Matrix2d &J);
