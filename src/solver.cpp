@@ -9,6 +9,7 @@
 #include <iostream>
 #include <math.h>
 #include "map_to_boundary.hpp"
+#include "gauss_seidel.hpp"
 
 // Solves  L*x = 0 s.t. X_known stays X_known (constraints need to be set in result X)
 template <typename Derived, typename Solver>
@@ -64,6 +65,114 @@ void solve_with_known(
             X.row(i) = x.row(row++);
 }
 
+//using gauss-seidel, X is both input for the inital guess and end output for the result
+template <typename Derived>
+void solve_with_known_gauss_seidel(
+      const Eigen::SparseMatrix<typename Derived::Scalar>& L,
+      const Eigen::Ref<const Eigen::VectorXi> known,
+      Eigen::MatrixBase<Derived>& X)
+{
+    typedef typename Derived::Scalar Scalar;
+    const int nv = L.rows();
+    Eigen::VectorXi idx = Eigen::VectorXi::Zero(nv);
+    int bc = known.size();
+    if (bc == nv){
+      return;
+    }
+    for (int i = 0; i < bc; i++){
+      idx[known[i]] = -i-1;
+    }
+    int row = 0;
+    for (int i = 0; i < nv; i++) if (idx[i]==0) idx[i] = row++;
+
+    std::vector<Eigen::Triplet<Scalar>> coef;
+    coef.reserve( (nv-known.rows())*6 );
+    Eigen::Matrix<Scalar,-1,-1> b = Eigen::Matrix<Scalar,-1,-1>::Zero(nv-known.rows(),X.cols());
+    for (int i = 0; i < L.outerSize(); ++i) {
+      for (typename Eigen::SparseMatrix<Scalar,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
+        if (idx[it.row()] >= 0){
+          if (idx[it.col()] >= 0){
+            coef.push_back(Eigen::Triplet<Scalar>(idx[it.row()], idx[it.col()], it.value()));
+          } else {
+            b.row(idx[it.row()]) -= X.row(it.col())*it.value();
+          }
+        }
+      }
+    }
+
+    Eigen::SparseMatrix<Scalar> A(nv-known.rows(),nv-known.rows());
+    A.setFromTriplets(coef.begin(), coef.end());
+    Eigen::Matrix<Scalar,-1,-1> x;
+    x.resize(nv-known.rows(), X.cols());
+
+    row = 0;
+    for (int i = 0; i < nv; i++)
+        if (idx[i] >= 0)
+            x.row(row++) = X.row(i);
+
+    gauss_seidel(A, b, x);
+     
+    row = 0;
+    for (int i = 0; i < nv; i++)
+        if (idx[i] >= 0)
+            X.row(i) = x.row(row++);
+}
+
+template <typename Derived>
+void solve_with_known_gauss_seidel(
+      const Eigen::SparseMatrix<typename Derived::Scalar>& L,
+      const Eigen::Ref<const Eigen::VectorXi> known,
+      const int maxIter,
+      Eigen::MatrixBase<Derived>& X)
+{
+    typedef typename Derived::Scalar Scalar;
+    const int nv = L.rows();
+    Eigen::VectorXi idx = Eigen::VectorXi::Zero(nv);
+    int bc = known.size();
+    if (bc == nv){
+      return;
+    }
+    for (int i = 0; i < bc; i++){
+      idx[known[i]] = -i-1;
+    }
+    int row = 0;
+    for (int i = 0; i < nv; i++) if (idx[i]==0) idx[i] = row++;
+
+    std::vector<Eigen::Triplet<Scalar>> coef;
+    coef.reserve( (nv-known.rows())*6 );
+    Eigen::Matrix<Scalar,-1,-1> b = Eigen::Matrix<Scalar,-1,-1>::Zero(nv-known.rows(),X.cols());
+    for (int i = 0; i < L.outerSize(); ++i) {
+      for (typename Eigen::SparseMatrix<Scalar,Eigen::ColMajor>::InnerIterator it(L,i); it; ++it) {
+        if (idx[it.row()] >= 0){
+          if (idx[it.col()] >= 0){
+            coef.push_back(Eigen::Triplet<Scalar>(idx[it.row()], idx[it.col()], it.value()));
+          } else {
+            b.row(idx[it.row()]) -= X.row(it.col())*it.value();
+          }
+        }
+      }
+    }
+
+    Eigen::SparseMatrix<Scalar> A(nv-known.rows(),nv-known.rows());
+    A.setFromTriplets(coef.begin(), coef.end());
+    Eigen::Matrix<Scalar,-1,-1> x;
+    x.resize(nv-known.rows(), X.cols());
+
+    row = 0;
+    for (int i = 0; i < nv; i++)
+        if (idx[i] >= 0)
+            x.row(row++) = X.row(i);
+
+    gauss_seidel(A, b, maxIter, x);
+     
+    row = 0;
+    for (int i = 0; i < nv; i++)
+        if (idx[i] >= 0)
+            X.row(i) = x.row(row++);
+}
+
+
+
 void solve_with_known_cholmod(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, Eigen::MatrixXd &X){
   Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>> solver;
   solve_with_known(L, known, solver, X);
@@ -100,4 +209,19 @@ void solve_with_known_try_cholmod(const Eigen::SparseMatrix<double> &L, const Ei
     Eigen::SparseLU<Eigen::SparseMatrix<double>> backup;
     solve_with_known(L, known, backup, X);
   }
+}
+
+void solve_with_known_gs(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, Eigen::MatrixXd &X){
+  solve_with_known_gauss_seidel(L, known, X);  
+}
+void solve_with_known_gs(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, Eigen::Matrix<double, -1, 2> &X){
+  solve_with_known_gauss_seidel(L, known, X);  
+}
+
+
+void solve_with_known_gs(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, const int maxIter, Eigen::MatrixXd &X){
+  solve_with_known_gauss_seidel(L, known, maxIter, X);  
+}
+void solve_with_known_gs(const Eigen::SparseMatrix<double> &L, const Eigen::Ref<const Eigen::VectorXi> known, const int maxIter, Eigen::Matrix<double, -1, 2> &X){
+  solve_with_known_gauss_seidel(L, known, maxIter, X);  
 }

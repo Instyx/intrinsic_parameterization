@@ -42,3 +42,12 @@ struct Timings
 	std::chrono::duration<float, std::milli> __elapsed = __end - __start; \
 	std::cout << name << " took: " << __elapsed.count() << "ms" << std::endl;    \
 } while(0);
+
+#define ASSIGN_TIME_BLOCK(var, ...) do {                                           \
+    auto __start = std::chrono::high_resolution_clock::now();                    \
+    __VA_ARGS__                                                                  \
+    auto __end = std::chrono::high_resolution_clock::now();                      \
+	std::chrono::duration<float, std::milli> __elapsed = __end - __start; \
+  var = __elapsed.count();                                               \
+	std::cout  << " took: " << var << "ms" << std::endl;    \
+} while(0);

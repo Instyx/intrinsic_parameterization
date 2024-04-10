@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.16..3.21)
 project(iparam)
 
 # Path definitions:
+set(CMAKE_PREFIX_PATH "/usr/inlcude/suitesparse" ${CMAKE_PREFIX_PATH})
+
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(IPARAM_EXTERNAL_DIR "external")
 # Configure general CMake variables
@@ -52,9 +54,9 @@ igl_include(imgui)
 igl_include(copyleft cgal)
 
 # Add Cholmod
-find_package(SuiteSparse REQUIRED)
-include_directories(${CHOLMOD_INCLUDE_DIR})
-
+# find_package(SuiteSparse REQUIRED)
+# include_directories(${CHOLMOD_INCLUDE_DIR})
+find_package(CHOLMOD REQUIRED)
 
 # Add Nanobind
 find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
