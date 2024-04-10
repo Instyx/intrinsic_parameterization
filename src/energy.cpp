@@ -2,6 +2,7 @@
 #pragma cling add_library_path("")
 #include "energy.hpp"
 #include <iostream>
+#include "parameterization.hpp"
 
 inline Eigen::Matrix2d get_J(const Eigen::MatrixXd& UV, const double lens[3], const int indices[3]){
   const double len2sq = lens[2]*lens[2];
@@ -38,6 +39,7 @@ void tri_wise_energy_int(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (
     E.resize( mesh_data.intTri->intrinsicMesh->nFaces());
 
     mesh_data.intTri->requireEdgeLengths();
+    mesh_data.intTri->requireFaceAreas();
     size_t i = 0;
     for(auto f : mesh_data.intTri->intrinsicMesh->faces()) {
       double lens[3];

@@ -54,6 +54,17 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
 }
 
 void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, Results &res){
+  const int n = data_mesh.intTri->intrinsicMesh->nFaces();
+  const Eigen::VectorXd afterTriEnergy(n), beforeTriEnergy(n);
+  return store_intrinsic_mesh(data_mesh, UV, filename, beforeTriEnergy, afterTriEnergy, res);
+}
+
+void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, const Eigen::VectorXd& beforeTriEnergy, const Eigen::VectorXd& afterTriEnergy){
+  Results res;
+  return store_intrinsic_mesh(data_mesh, UV, filename, beforeTriEnergy, afterTriEnergy, res);
+}
+
+void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, const Eigen::VectorXd& beforeTriEnergy, const Eigen::VectorXd& afterTriEnergy, Results &res){
 
   auto start = std::chrono::high_resolution_clock::now();
   gcs::CommonSubdivision& cs = data_mesh.intTri->getCommonSubdivision();
@@ -67,11 +78,20 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
   res.cm_time = duration;
   res.ext_vertex_count = data_mesh.intTri->intrinsicMesh->nVertices();
   res.cs_vertex_count = cs.mesh->nVertices();
-  return;
+  // return;
 
-  gcs::FaceData<double> faceIDs = niceColors(*data_mesh.intTri->intrinsicMesh, 7);
-  auto data = cs.copyFromB(faceIDs);
-  // auto data = cs.copyFromA(faceIDs);
+  gcs::FaceData<double> colorIDs = niceColors(*data_mesh.intTri->intrinsicMesh, 7);
+  gcs::FaceData<double> beforeTriEnergyData = gcs::FaceData<double>(*data_mesh.inputMesh, beforeTriEnergy);
+  gcs::FaceData<double> afterTriEnergyData = gcs::FaceData<double>(*data_mesh.intTri->intrinsicMesh, afterTriEnergy);
+  gcs::FaceData<double> extrId(*cs.mesh), intrId(*cs.mesh);
+  auto color = cs.copyFromB(colorIDs);
+  auto extr = cs.copyFromA(beforeTriEnergyData);
+  auto intr = cs.copyFromB(afterTriEnergyData);
+  for (auto f : cs.mesh->faces()) {
+    extrId[f] = cs.sourceFaceA[f].getIndex();
+    intrId[f] = cs.sourceFaceB[f].getIndex();
+  }
+  // auto data = cs.copyFromA(colorIDs);
   gcs::VertexData<gc::Vector3> csPositions = cs.interpolateAcrossA(data_mesh.inputGeometry->vertexPositions);
   gcs::VertexData<double> u(*data_mesh.intTri->intrinsicMesh);
   gcs::VertexData<double> v(*data_mesh.intTri->intrinsicMesh);
@@ -94,12 +114,19 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
   }
   gcs::RichSurfaceMeshData richData(*cs.mesh);
   richData.outputFormat = happly::DataFormat::ASCII;
-  richData.addMeshConnectivity();
+
+  std::vector<std::vector<size_t>> faceIndices = cs.mesh->getFaceVertexList();
+  richData.plyData.addFaceIndices(faceIndices);
+
   richData.addVertexProperty("x", x);
   richData.addVertexProperty("y", y);
   richData.addVertexProperty("z", z);
   richData.addVertexProperty("u", uPositions);
   richData.addVertexProperty("v", vPositions);
-  richData.addFaceProperty("OGFaceIds", data);
+  richData.addFaceProperty("ExtrID", extrId);
+  richData.addFaceProperty("IntrColor", color);
+  richData.addFaceProperty("IntrID", intrId);
+  richData.addFaceProperty("ExtrEnergy", extr);
+  richData.addFaceProperty("IntrEnergy", intr);
   richData.write(filename+".int.ply");
 }

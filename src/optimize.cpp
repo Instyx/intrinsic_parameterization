@@ -6,9 +6,27 @@
 #include <igl/slim.h>
 #include <igl/writeOBJ.h>
 
+#include "energy.hpp"
 #include "intrinsicslim.hpp"
 #include "parameterization.hpp"
 #include "store_intrinsic_mesh.hpp"
+#include "distortion_energy.hpp"
+
+#include <iostream>
+#include <fstream>
+
+inline void saveData(std::string fileName, Eigen::MatrixXd matrix)
+{
+	//https://eigen.tuxfamily.org/dox/structEigen_1_1IOFormat.html
+	const static Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+
+	std::ofstream file(fileName);
+	if (file.is_open())
+	{
+		file << std::setprecision(128) << matrix.format(CSVFormat);
+		file.close();
+	}
+}
 
 Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType method, std::string dir, std::string mesh_name){
   return optimize_single(V, F, method, dir, mesh_name, false, false);
@@ -80,6 +98,10 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   double tol = 1e-8;
   unsigned max_iterations = 1000;
   unsigned itr = 0;
+
+  double (*energyfunc)(const Eigen::Matrix2d &);
+  Eigen::VectorXd tri_wise_E_before, tri_wise_E_after;
+
   // Extrinsic normal first run
   std::cout << "------------ EXTRINSIC --------------" <<std::endl;
   std::cout << "Initialization:" << std::endl;
@@ -92,6 +114,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
       UV_ext = harmonic(data_mesh, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
+      energyfunc = &dirichlet;
       break;
     }
     case EnergyType::ASAP:{
@@ -99,6 +122,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
       UV_ext = LSCM(data_mesh, true, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
+      energyfunc = &asap;
       break;
     }
     case EnergyType::ARAP:{
@@ -107,6 +131,7 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
       iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, max_iterations, true, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
+      energyfunc = &arap;
       break;
     }
     case EnergyType::SYMMETRIC_DIRICHLET:{
@@ -116,12 +141,14 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
       end = std::chrono::high_resolution_clock::now();
       UV_ext = slimdata.V_o;
       curr_energy = slimdata.energy/2;
+      energyfunc = &symmetric_dirichlet;
       break;
     }
     default:
       throw std::invalid_argument("Method unknown");
   }
   duration_init = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
   // collecting results
   res.opt_durations.push_back(duration_init);
   res.opt_iterations.push_back(iterations);
@@ -130,7 +157,12 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   std::cout << "  parameterization took " << duration_init << "ms in "<< iterations << " iterations" << std::endl;
   std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
-  //igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
+  igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
+
+  // store energy per triangle
+  tri_wise_energy(data_mesh, UV_ext, energyfunc, init_with_intrinsic, tri_wise_E_before);
+  str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".energy";
+  saveData(str, tri_wise_E_before);
 
   //IPARAM
   std::cout << "------------ IPARAM --------------" <<std::endl;
@@ -230,16 +262,20 @@ Results optimize_single(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType metho
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
-  //igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
-/*
+  igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
+
+  // store energy per triangle
+  tri_wise_energy(data_mesh, UV_iparam, energyfunc, true, tri_wise_E_after);
+  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".energy";
+  saveData(str, tri_wise_E_after);
+
+  // try {
+  //   store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  // } catch (...) {
+  //   std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  // }
   try {
-    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  } catch (...) {
-    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
-  }
-  */
-  try {
-    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension, res);
+    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension, tri_wise_E_before, tri_wise_E_after, res);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
