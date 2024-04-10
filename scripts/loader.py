@@ -98,27 +98,27 @@ def render_intrinsic_mesh(name, mesh):
 
 
 
-path = "../build/45939/arap"
-mesh_name = "45939"
-dd = create_intrinsic_mesh(path, mesh_name)
-
-iparamE = np.array([float(n) for n in open(path +"/"+ mesh_name + "_iparam.energy").read().split("\n")])
-extrE = np.array([float(n) for n in open(path +"/"+ mesh_name + "_ext.energy").read().split("\n")])
-
-extrE.sum()-iparamE.sum()
-
-max(dd.extrId.astype(np.uint32))
-
-extrE[dd.extrId.astype(np.uint32)]
-iparamE[dd.extrId.astype(np.uint32)]
-dd.extrEn
-dd.intrEn
-
-dd.extrEn.sum()-dd.intrEn.sum()
-
-render_intrinsic_mesh("w", dd)
-
-ps.show()
+# path = "../build/45939/arap"
+# mesh_name = "45939"
+# dd = create_intrinsic_mesh(path, mesh_name)
+#
+# iparamE = np.array([float(n) for n in open(path +"/"+ mesh_name + "_iparam.energy").read().split("\n")])
+# extrE = np.array([float(n) for n in open(path +"/"+ mesh_name + "_ext.energy").read().split("\n")])
+#
+# extrE.sum()-iparamE.sum()
+#
+# max(dd.extrId.astype(np.uint32))
+#
+# extrE[dd.extrId.astype(np.uint32)]
+# iparamE[dd.intrId.astype(np.uint32)]
+# dd.extrEn
+# dd.intrEn
+#
+# dd.extrEn.sum()-dd.intrEn.sum()
+#
+# render_intrinsic_mesh("w", dd)
+#
+# ps.show()
 #
 # ps.init()
 # ext_mesh = meshio.read("output/spike/dirichlet/spike_ext.obj")
