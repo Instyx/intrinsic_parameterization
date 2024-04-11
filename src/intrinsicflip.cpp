@@ -63,6 +63,8 @@ bool isConcave(std::vector<Eigen::Vector2d>& points){
 
 
 bool isFlipPossible(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &e){
+  data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->unrequireVertexIndices();
   std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
   
   //        v3 /\
@@ -441,7 +443,9 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     if (checked_diamonds.find(std::make_tuple(quad[0],quad[1],quad[2],quad[3])) != checked_diamonds.end()) continue;
     else checked_diamonds[std::make_tuple(quad[0],quad[1],quad[2],quad[3])] = true;
     Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
+   // std::cout << " before flip check" << std::endl;
     if(!isFlipPossible(data_mesh, UV, e)) continue;
+    //std::cout << " before face jacobian" << std::endl;
     faceJacobian(data_mesh, UV, f1, J1);
     faceJacobian(data_mesh, UV, f2, J2);
     double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
@@ -454,6 +458,7 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
 
     //std::cout << "areas before: " << data_mesh.intTri->faceArea(f1) << "  " << data_mesh.intTri->faceArea(f2) << std::endl;
     //std::cout << "edge before: " << data_mesh.intTri->edgeLengths[f1.halfedge().edge()] << "  " << data_mesh.intTri->edgeLengths[f1.halfedge().next().edge()] << "  " <<data_mesh.intTri->edgeLengths[f1.halfedge().next().next().edge()] << std::endl;
+    //std::cout << " before flip" << std::endl;
     if (!data_mesh.intTri->flipEdgeIfPossible(e)) continue;
     data_mesh.intTri->refreshQuantities();
     gcs::Edge flipped = e;
