@@ -1,10 +1,15 @@
 #include "parameterization.hpp"
+#include "lscm.hpp"
+#include "harmonic.hpp"
+#include "adjacency.hpp"
+#include "map_to_boundary.hpp"
 
 #include <string>
 #include <filesystem>
 #include "read_mesh.hpp"
 #include <igl/copyleft/cgal/orient2D.h>
-#include <igl/lscm.h>
+#include <igl/cotmatrix.h>
+
 
 void flipped_elements(
   const Eigen::MatrixXd& V,
@@ -46,16 +51,23 @@ int toFilter(Eigen::MatrixXd &V, Eigen::MatrixXi &F){
   data_mesh.intTri->requireEdgeLengths();
   data_mesh.intTri->requireVertexIndices();
   data_mesh.intTri->requireFaceAreas();
-  Eigen::MatrixXd UV_ext;
+  Eigen::Matrix<double, -1, 2> UV_ext;
+  Eigen::VectorXi B;
+  bdy_loop(F, V, B);
 
   std::cout << "------ HARMONIC --------" <<  std::endl;
-  UV_ext = harmonic(data_mesh, false);
+  // UV_ext = harmonic(data_mesh, false);
+  Eigen::SparseMatrix<double> L;
+  igl::cotmatrix(V,F,L);
+  circle_boundary_proportional(V, B, UV_ext);
+  harmonic(-L,B,UV_ext,2);
   if(isFlipped(data_mesh, UV_ext)){
     return 1;
   }
 
   std::cout << "------ CONFORMAL --------" << std::endl;
-  UV_ext = LSCM(data_mesh, true, false);
+  lscm(F, V, -L, UV_ext);
+  // UV_ext = LSCM(data_mesh, true, false);
   if(isFlipped(data_mesh, UV_ext)){
     return 2;
   }
