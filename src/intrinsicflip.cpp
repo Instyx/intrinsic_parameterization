@@ -64,7 +64,6 @@ bool isConcave(std::vector<Eigen::Vector2d>& points){
 
 bool isFlipPossible(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &e){
   data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->unrequireVertexIndices();
   std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
   
   //        v3 /\
@@ -87,6 +86,7 @@ bool isFlipPossible(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &e)
   points[1] = UV.row(v4).transpose();
   points[2] = UV.row(v2).transpose();
   points[3] = UV.row(v3).transpose();
+  data_mesh.intTri->unrequireVertexIndices();
 
 
   // if flip causes self loop, don't flip
@@ -111,6 +111,49 @@ bool isFlipPossible(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &e)
   return true;
 
 }
+
+bool isFlipPossible(DataGeo &data_mesh, gcs::Edge &e){
+  data_mesh.intTri->requireVertexIndices();
+  std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
+  
+  //        v3 /\
+  //          /  \
+  //         /    \
+  //     v1 / _ e _\ v2
+  //        \     /
+  //         \   /
+  //          \ /
+  //          v4
+  
+   
+  size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
+  size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
+  size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
+  size_t v4 = data_mesh.intTri->vertexIndices[halfedges[2].tipVertex()];
+
+   data_mesh.intTri->unrequireVertexIndices();
+
+
+  // if flip causes self loop, don't flip
+  if(v3==v4) return false;
+
+  // if one of the end vertices has degree smaller than 3, don't flip
+  // if the vertex is in the boundary, check if smaller than 2
+  if(halfedges[1].tipVertex().isBoundary()){
+    if(halfedges[1].tipVertex().degree()<=2) return false;
+  }
+  else if(halfedges[1].tipVertex().degree()<=3) return false;
+
+  if(halfedges[0].tailVertex().isBoundary()){
+    if(halfedges[0].tailVertex().degree()<=2) return false;
+  }
+  else if(halfedges[0].tailVertex().degree()<=3) return false;
+
+
+  return true;
+
+}
+
 
 // DO NOT USE
 bool diamondJacobians(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge &e, Eigen::Matrix2d &J1, Eigen::Matrix2d &J2){
@@ -424,7 +467,6 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
   else if(et==EnergyType::ARAP) energy = arap;
   else if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
   data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->unrequireEdgeLengths();
   unsigned totalflips = 0;
   delaunay_flips = 0;
   std::unordered_map<std::tuple<int, int, int, int>, bool> checked_diamonds;
@@ -460,7 +502,6 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     //std::cout << "edge before: " << data_mesh.intTri->edgeLengths[f1.halfedge().edge()] << "  " << data_mesh.intTri->edgeLengths[f1.halfedge().next().edge()] << "  " <<data_mesh.intTri->edgeLengths[f1.halfedge().next().next().edge()] << std::endl;
     //std::cout << " before flip" << std::endl;
     if (!data_mesh.intTri->flipEdgeIfPossible(e)) continue;
-    data_mesh.intTri->refreshQuantities();
     gcs::Edge flipped = e;
     f1 = flipped.halfedge().face();
     f2 = flipped.halfedge().twin().face();
@@ -490,13 +531,14 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
     } else {
       //data_mesh.intTri->flipEdgeIfPossible(flipped);
       data_mesh.intTri->flipEdgeManual(flipped, length, forwardangle, reverseangle, isOrig, true);
-      data_mesh.intTri->refreshQuantities();
      // std::cout << "areas before: " << data_mesh.intTri->faceArea(flipped.halfedge().face()) << "  " << data_mesh.intTri->faceArea(flipped.halfedge().twin().face()) << std::endl;
       //std::cout << "edge before: " << data_mesh.intTri->edgeLengths[f1.halfedge().edge()] << "  " << data_mesh.intTri->edgeLengths[f1.halfedge().next().edge()] << "  " <<data_mesh.intTri->edgeLengths[f1.halfedge().next().next().edge()] << std::endl;
       //double en = compute_total_energy_localjacob(data_mesh, UV, et);
       //std::cout << "NOT FLIPPED: " << en << std::endl;
     }
   }
+  data_mesh.intTri->unrequireEdgeLengths();
+  data_mesh.intTri->refreshQuantities();
   return totalflips;
 }
 
@@ -647,49 +689,21 @@ unsigned delaunay_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const Ener
 
 
 unsigned asIDTasPossible(DataGeo &data_mesh){
-  data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->unrequireVertexIndices();
   unsigned totalflips = 0;
   unsigned flips = 1;
   while(flips){
     unsigned local_flips = 0;
     for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
       if(e.isBoundary()) continue;
-      std::array<gcs::Halfedge, 4> halfedges = e.diamondBoundary();
-
-      //        v3 /\
-      //          /  \
-      //         /    \
-      //     v1 / _ e _\ v2
-      //        \     /
-      //         \   /
-      //          \ /
-      //          v4
-      size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
-      size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
-      size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
-      size_t v4 = data_mesh.intTri->vertexIndices[halfedges[2].tipVertex()];
-      // if flip causes self loop, don't flip
-      if(v3==v4) {
-        //std::cout << "self loop" << std::endl;
-        continue;
-      }
-      // if one of the end vertices has degree smaller than 3, don't flip
-      if(halfedges[1].tipVertex().degree()<=3 || halfedges[0].tailVertex().degree()<=3) {
-        //std::cout << "degree 3" << std::endl;
-        continue;
-      }
+      if(!isFlipPossible(data_mesh, e)) continue;
       if(data_mesh.intTri->flipEdgeIfNotDelaunay(e)){
           local_flips++;
-          data_mesh.intTri->refreshQuantities();
-
       }
-
     }
     //std::cout << "flipso: " << local_flips << std::endl;
     flips = local_flips;
     totalflips += flips;
   }
-
+  data_mesh.intTri->refreshQuantities();
   return totalflips;
 }

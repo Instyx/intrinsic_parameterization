@@ -851,9 +851,7 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   int i = 0;
   std::array<gcs::Halfedge, 3> halfedges;
   data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->unrequireEdgeLengths();
   data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->unrequireVertexIndices();
 
   for(gcs::Halfedge he : f.adjacentHalfedges()){
     if(i==3) break; // assumed triangle faces
@@ -865,6 +863,7 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   double fi_len1 = data_mesh.intTri->edgeLengths[halfedges[0].edge()];
   double fi_len2 = data_mesh.intTri->edgeLengths[halfedges[1].edge()];
   double fi_len3 = data_mesh.intTri->edgeLengths[halfedges[2].edge()];
+  data_mesh.intTri->unrequireEdgeLengths();
 
   Eigen::Matrix2d E, E_tilde;
   double temp = (fi_len2*fi_len2 - fi_len1*fi_len1 - fi_len3*fi_len3)/(-2*fi_len1);
@@ -874,6 +873,8 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   size_t v1 = data_mesh.intTri->vertexIndices[halfedges[1].tipVertex()];
   size_t v2 = data_mesh.intTri->vertexIndices[halfedges[0].tailVertex()];
   size_t v3 = data_mesh.intTri->vertexIndices[halfedges[0].tipVertex()];
+  data_mesh.intTri->unrequireVertexIndices();
+
   E << UV(v3,0) - UV(v2,0), UV(v1,0) - UV(v2,0),
         UV(v3,1) - UV(v2,1), UV(v1,1) - UV(v2,1);
   Eigen::Matrix2d E_tilde_inverse;

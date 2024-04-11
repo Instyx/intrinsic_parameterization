@@ -133,8 +133,8 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     start = std::chrono::high_resolution_clock::now();
     if(init_with_intrinsic){
       data_mesh.intTri->requireCotanLaplacian();
-      data_mesh.intTri->unrequireCotanLaplacian();
       L = data_mesh.intTri->cotanLaplacian;
+      data_mesh.intTri->unrequireCotanLaplacian();
     }
     else{
       igl::cotmatrix(V,F,L);
@@ -266,8 +266,8 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
       case EnergyType::DIRICHLET:{
         start = std::chrono::high_resolution_clock::now();
         data_mesh.intTri->requireCotanLaplacian();
-        data_mesh.intTri->unrequireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
+        data_mesh.intTri->unrequireCotanLaplacian();
         harmonic(L, B, UV_iparam, 2);
         end = std::chrono::high_resolution_clock::now();
         curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
@@ -277,8 +277,8 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
         // compute with gauss seidel
         start = std::chrono::high_resolution_clock::now();
         data_mesh.intTri->requireCotanLaplacian();
-        data_mesh.intTri->unrequireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
+        data_mesh.intTri->unrequireCotanLaplacian();
         F_touse = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
         Eigen::MatrixXd UV_new;
         lscm(F_touse, V, L, UV_iparam, fixed1, fixed2, UV_new);

@@ -22,9 +22,7 @@ void computeSurfaceGradientMatrix(const Eigen::MatrixXd &V, const Eigen::MatrixX
 void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx,
     Eigen::SparseMatrix<double> & Dy, Eigen::VectorXd &areas){
   data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->unrequireEdgeLengths();
   data_mesh.intTri->requireFaceIndices();
-  data_mesh.intTri->unrequireFaceIndices();
 
   Eigen::SparseMatrix<double>G;
   Eigen::SparseMatrix<double>OG;
@@ -53,6 +51,8 @@ void computeGrad_intrinsic(DataGeo &data_mesh, Eigen::SparseMatrix<double> & Dx,
     }
     areas(idx) = data_mesh.intTri->faceArea(face);
   }
+  data_mesh.intTri->unrequireEdgeLengths();
+  data_mesh.intTri->unrequireFaceIndices();
   // igl::grad(data_mesh.intTri->inputGeom->vertexPositions, data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>(), OG);
   igl::grad_intrinsic(lengths, F_new, G);
   Dx.resize(nfaces, nvertices);
