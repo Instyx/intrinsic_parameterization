@@ -6,6 +6,7 @@
 #include <igl/slim.h>
 #include <igl/writeOBJ.h>
 
+#include "energy.hpp"
 #include "intrinsicslim.hpp"
 #include "parameterization.hpp"
 #include "store_intrinsic_mesh.hpp"
@@ -13,6 +14,24 @@
 #include "lscm.hpp"
 #include "tutte.hpp"
 #include "adjacency.hpp"
+#include "distortion_energy.hpp"
+#include "map_to_boundary.hpp"
+
+#include <iostream>
+#include <fstream>
+
+inline void saveData(std::string fileName, Eigen::MatrixXd matrix)
+{
+	//https://eigen.tuxfamily.org/dox/structEigen_1_1IOFormat.html
+	const static Eigen::IOFormat CSVFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n");
+
+	std::ofstream file(fileName);
+	if (file.is_open())
+	{
+		file << std::setprecision(128) << matrix.format(CSVFormat);
+		file.close();
+	}
+}
 
 Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType method, std::string dir, std::string mesh_name){
   return optimize_single(V, F, method, dir, mesh_name, false, false);
@@ -84,20 +103,24 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
   double tol = 1e-8;
   unsigned max_iterations = 1000;
   unsigned itr = 0;
+
+  double (*energyfunc)(const Eigen::Matrix2d &);
+  Eigen::VectorXd tri_wise_E_before, tri_wise_E_after;
+
   // Extrinsic normal first run
   std::cout << "------------ EXTRINSIC --------------" <<std::endl;
   std::cout << "Initialization:" << std::endl;
   std::cout << "  constructing datastructure took " << duration_init << "ms" << std::endl;
   std::cout << "Interation: " << itr << std::endl;
   unsigned iterations = 1;
-      
+
 
   Eigen::VectorXi VT, VTi;
   Eigen::Matrix<int, -1, 3> TT;
   Eigen::VectorXi VV, VVi;
   Eigen::VectorXi B;
   Eigen::SparseMatrix<double> L;
-  
+
   Eigen::MatrixXi F_touse = init_with_intrinsic ? data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>() : F;
 
   start = std::chrono::high_resolution_clock::now();
@@ -107,43 +130,47 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
   bdy_loop(F_touse, TT, VT, VTi, B);
   end = std::chrono::high_resolution_clock::now();
   auto boundary_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
 
-  start = std::chrono::high_resolution_clock::now();
-  if(init_with_intrinsic){
-    data_mesh.intTri->requireCotanLaplacian(); 
-    L = data_mesh.intTri->cotanLaplacian;
+  if (method == EnergyType::DIRICHLET || method == EnergyType::ASAP){
+    start = std::chrono::high_resolution_clock::now();
+    if(init_with_intrinsic){
+      data_mesh.intTri->requireCotanLaplacian();
+      L = data_mesh.intTri->cotanLaplacian;
+    }
+    else{
+      igl::cotmatrix(V,F,L);
+      L = -L;
+    }
+    end = std::chrono::high_resolution_clock::now();
   }
-  else{
-    igl::cotmatrix(V,F,L);
-    L = -L;
-  }
-  end = std::chrono::high_resolution_clock::now();
   auto L_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-
-  start = std::chrono::high_resolution_clock::now();
-  unsigned fixed1 = B[0], fixed2 = B[0];
-  for (unsigned i = 0; i < B.rows(); ++i) {
-    for (unsigned j = 0; j < B.rows(); ++j) {
-      if((V.row(B[i])-V.row(B[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
-        fixed1 = B[i];
-        fixed2 = B[j];
+  unsigned fixed1, fixed2;
+  if (method == EnergyType::ASAP){
+    start = std::chrono::high_resolution_clock::now();
+    fixed1 = B[0], fixed2 = B[0];
+    for (unsigned i = 0; i < B.rows(); ++i) {
+      for (unsigned j = 0; j < B.rows(); ++j) {
+        if((V.row(B[i])-V.row(B[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
+          fixed1 = B[i];
+          fixed2 = B[j];
+        }
       }
     }
+    end = std::chrono::high_resolution_clock::now();
   }
-  end = std::chrono::high_resolution_clock::now();
-
   auto fixedpoint_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   duration_init = 0;
   switch (method) {
     case EnergyType::DIRICHLET:{
       start = std::chrono::high_resolution_clock::now();
-      harmonic(L, B, UV_ext, 0);
+      circle_boundary_proportional(V, B, UV_ext);
+      harmonic(L, B, UV_ext, 2);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
-      duration_init+= boundary_time + L_time;
+      duration_init += boundary_time + L_time;
+      energyfunc = &dirichlet;
       break;
     }
     case EnergyType::ASAP:{
@@ -151,28 +178,33 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
       lscm(F_touse, V, L, fixed1, fixed2, UV_ext);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
-      duration_init+= boundary_time + L_time + fixedpoint_time;
+      duration_init += boundary_time + L_time + fixedpoint_time;
+      energyfunc = &asap;
       break;
     }
     case EnergyType::ARAP:{
       start = std::chrono::high_resolution_clock::now();
       Eigen::Matrix<double, -1, 2> UV_ext_init;
+      circle_boundary_proportional(V, B, UV_ext_init);
       tutte(VV, VVi, B, UV_ext_init, 0);
       iterations = ARAP_tillconverges(data_mesh, UV_ext_init, UV_ext, max_iterations, true, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       curr_energy = compute_total_energy_localjacob(data_mesh, UV_ext, method);
-      duration_init+= boundary_time; // needed for tutte
+      energyfunc = &arap;
+      duration_init += boundary_time; // needed for tutte
       break;
     }
     case EnergyType::SYMMETRIC_DIRICHLET:{
       start = std::chrono::high_resolution_clock::now();
       Eigen::Matrix<double, -1, 2> UV_ext_init;
+      circle_boundary_proportional(V, B, UV_ext_init);
       tutte(VV, VVi, B, UV_ext_init, 0);
       iterations = slim_tillconverges(data_mesh, slimdata, V, F, UV_ext_init, 1000, init_with_intrinsic);
       end = std::chrono::high_resolution_clock::now();
       UV_ext = slimdata.V_o;
       curr_energy = slimdata.energy/2;
-      duration_init+= boundary_time; // needed for tutte
+      energyfunc = &symmetric_dirichlet;
+      duration_init += boundary_time; // needed for tutte
       break;
     }
     default:
@@ -187,7 +219,12 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
   std::cout << "  parameterization took " << duration_init << "ms in "<< iterations << " iterations" << std::endl;
   std::cout << "    energy: " << std::setprecision(32) << curr_energy << std::endl;
   std::string str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".obj";
-  //igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
+  igl::writeOBJ(str, V, F, CN, FN, UV_ext, F);
+
+  // store energy per triangle
+  tri_wise_energy(data_mesh, UV_ext, energyfunc, init_with_intrinsic, tri_wise_E_before);
+  str = to_store_dir + "/" + mesh_name_wo_extension + "_ext" + ".energy";
+  saveData(str, tri_wise_E_before);
 
   //IPARAM
   std::cout << "------------ IPARAM --------------" <<std::endl;
@@ -229,7 +266,7 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     switch (method) {
       case EnergyType::DIRICHLET:{
         start = std::chrono::high_resolution_clock::now();
-        data_mesh.intTri->requireCotanLaplacian(); 
+        data_mesh.intTri->requireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
         harmonic(L, B, UV_iparam, 0);
         end = std::chrono::high_resolution_clock::now();
@@ -238,9 +275,9 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
       }
       case EnergyType::ASAP:{
         start = std::chrono::high_resolution_clock::now();
-        data_mesh.intTri->requireCotanLaplacian(); 
+        data_mesh.intTri->requireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
-        F_touse = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>(); 
+        F_touse = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
         lscm(F_touse, V, L, fixed1, fixed2, UV_iparam);
         end = std::chrono::high_resolution_clock::now();
         curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
@@ -291,16 +328,20 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
   }
 
   str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".obj";
-  //igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
-/*
+  igl::writeOBJ(str, V, F, CN, FN, UV_iparam, F);
+
+  // store energy per triangle
+  tri_wise_energy(data_mesh, UV_iparam, energyfunc, true, tri_wise_E_after);
+  str = to_store_dir + "/" + mesh_name_wo_extension + "_iparam" + ".energy";
+  saveData(str, tri_wise_E_after);
+
+  // try {
+  //   store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
+  // } catch (...) {
+  //   std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
+  // }
   try {
-    store_intrinsic_edges(data_mesh, to_store_dir + "/" + mesh_name_wo_extension);
-  } catch (...) {
-    std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
-  }
-  */
-  try {
-    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension, res);
+    store_intrinsic_mesh(data_mesh, UV_iparam, to_store_dir + "/" + mesh_name_wo_extension, tri_wise_E_before, tri_wise_E_after, res);
   } catch (...) {
     std::cout << "Error in mesh: " << mesh_name_wo_extension << std::endl;
   }
