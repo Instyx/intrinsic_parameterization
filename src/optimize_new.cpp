@@ -80,9 +80,7 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
   data_mesh.inputMesh.reset(new gcs::ManifoldSurfaceMesh(data_mesh.F));
   data_mesh.inputGeometry.reset(new gcs::VertexPositionGeometry(*data_mesh.inputMesh, data_mesh.V));
   data_mesh.intTri.reset(new gcs::SignpostIntrinsicTriangulation(*data_mesh.inputMesh, *data_mesh.inputGeometry));
-  data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->requireVertexIndices();
-  data_mesh.intTri->requireFaceAreas();
+
   Eigen::MatrixXd UV_ext;
   int initial_flips = -1;
   if (init_with_intrinsic) {
@@ -135,6 +133,7 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     start = std::chrono::high_resolution_clock::now();
     if(init_with_intrinsic){
       data_mesh.intTri->requireCotanLaplacian();
+      data_mesh.intTri->unrequireCotanLaplacian();
       L = data_mesh.intTri->cotanLaplacian;
     }
     else{
@@ -247,7 +246,7 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
     if (priority_queue_flips) {
       total_flips = priority_queue_flip(data_mesh, UV_iparam, total_del_flips, method);
     } else {
-      total_flips = edgeorder_flip(data_mesh, UV_iparam, total_del_flips, method);
+      total_flips = queue_flip(data_mesh, UV_iparam, total_del_flips, method);
     }
     end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -267,19 +266,24 @@ Results optimize_single_new(Eigen::MatrixXd &V, Eigen::MatrixXi &F, EnergyType m
       case EnergyType::DIRICHLET:{
         start = std::chrono::high_resolution_clock::now();
         data_mesh.intTri->requireCotanLaplacian();
+        data_mesh.intTri->unrequireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
-        harmonic(L, B, UV_iparam, 0);
+        harmonic(L, B, UV_iparam, 2);
         end = std::chrono::high_resolution_clock::now();
         curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
         break;
       }
       case EnergyType::ASAP:{
+        // compute with gauss seidel
         start = std::chrono::high_resolution_clock::now();
         data_mesh.intTri->requireCotanLaplacian();
+        data_mesh.intTri->unrequireCotanLaplacian();
         L = data_mesh.intTri->cotanLaplacian;
         F_touse = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
-        lscm(F_touse, V, L, fixed1, fixed2, UV_iparam);
+        Eigen::MatrixXd UV_new;
+        lscm(F_touse, V, L, UV_iparam, fixed1, fixed2, UV_new);
         end = std::chrono::high_resolution_clock::now();
+        UV_iparam = UV_new;
         curr_energy = compute_total_energy_localjacob(data_mesh, UV_iparam, method);
         break;
       }

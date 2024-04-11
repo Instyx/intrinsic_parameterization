@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
   std::cout << "energy: " << compute_total_energy(data_mesh, UV_new, EnergyType::ASAP, true) << std::endl;
   double energy_convergence, energy_maxitr; 
   TIME_BLOCK("gauss conv",
-    lscm(F_new, V, L, UV, UV_gs_convergence);
+    //lscm(F_new, V, L, UV, UV_gs_convergence);
     //std::cout << "energy w grad: " << compute_total_energy(data_mesh, UV_gs_convergence, EnergyType::ASAP, true) << std::endl;
   )
   energy_convergence = compute_total_energy_localjacob(data_mesh, UV_gs_convergence, EnergyType::ASAP);

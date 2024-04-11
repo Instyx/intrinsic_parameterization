@@ -14,18 +14,19 @@ void lscm(
   const Eigen::MatrixXi& F,
   const Eigen::MatrixXd& V,
   const Eigen::SparseMatrix<double>& L,
-  int fixed1,
-  int fixed2,
+  const unsigned fixed1,
+  const unsigned fixed2,
   Eigen::MatrixXd& UV
 );
-
 
 void lscm(
   const Eigen::MatrixXi& F,
   const Eigen::MatrixXd& V,
   const Eigen::SparseMatrix<double>& L,
-  const Eigen::Matrix<double,-1,2>& UV_init,
-  Eigen::Matrix<double, -1,2>& UV
+  const Eigen::MatrixXd& UV_init,
+  const unsigned fixed1,
+  const unsigned fixed2,
+  Eigen::MatrixXd& UV
 );
 
 void lscm(

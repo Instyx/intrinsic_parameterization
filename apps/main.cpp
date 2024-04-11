@@ -1,3 +1,5 @@
+#include "distortion_energy.hpp"
+#include "geometrycentral/surface/integer_coordinates_intrinsic_triangulation.h"
 #include <asm-generic/errno-base.h>
 #include <cinttypes>
 #include <igl/read_triangle_mesh.h>
@@ -16,6 +18,7 @@
 
 #include <datageo.hpp>
 #include <fstream>
+#include <ostream>
 #include <parameterization.hpp>
 #include <iglslim.hpp>
 #include <intrinsicflip.hpp>
@@ -27,6 +30,9 @@
 #include <metrics.hpp>
 #include <string>
 #include <chrono>
+#include <harmonic.hpp>
+#include <adjacency.hpp>
+#include <map_to_boundary.hpp>
 
 using namespace std;
 using namespace Eigen;
@@ -134,7 +140,7 @@ void reset_datageo(DataGeo &datageo){
 }
 
 // to visualize intrinsic edges on the UV domain
-void intrinsicUV(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri,Eigen::MatrixXd &UV, Eigen::MatrixXd &P1, Eigen::MatrixXd &P2){
+void intrinsicUV(const std::unique_ptr<gcs::SignpostIntrinsicTriangulation>& intTri,Eigen::MatrixXd &UV, Eigen::MatrixXd &P1, Eigen::MatrixXd &P2){
   vector<Eigen::Vector2d> points;
   vector<array<int,2> > edges;
   for(gcs::Edge e : intTri->intrinsicMesh->edges()){
@@ -173,7 +179,7 @@ Eigen::SparseVector<double> b(const gcs::SurfacePoint& pt){
 }
 
 // to visualize intrinsic edges on the mesh
-void intrinsicEdges(const std::unique_ptr<gcs::IntrinsicTriangulation>& intTri, const Eigen::MatrixXd& V, Eigen::MatrixXd& P1, Eigen::MatrixXd& P2) {
+void intrinsicEdges(const std::unique_ptr<gcs::SignpostIntrinsicTriangulation>& intTri, const Eigen::MatrixXd& V, Eigen::MatrixXd& P1, Eigen::MatrixXd& P2) {
   vector<Eigen::Vector3d> points;
   vector<array<int,2> > edges;
 
@@ -383,11 +389,41 @@ bool callback_key_pressed(Viewer &viewer, unsigned char key, int modifiers) {
   }
 
   case '7': {
+
+    Eigen::VectorXi VT, VTi;
+    Eigen::Matrix<int, -1, 3> TT;
+    Eigen::VectorXi VV, VVi;
+    Eigen::VectorXi B;
+    Eigen::SparseMatrix<double> L;
+
+    Eigen::MatrixXi F_touse = F;
+
+    vt_adjacency(F_touse, V, VT, VTi);
+    tt_adjacency(F_touse, VT, VTi, TT);
+    vv_adjacency(F_touse, V, TT, VV, VVi);
+    bdy_loop(F_touse, TT, VT, VTi, B);
+    igl::cotmatrix(V,F,L);
+
+    circle_boundary_proportional(V, B, UV);
+    harmonic(-L, B, UV, 2);
+    std::cout << "Laplacian: " << -L << std::endl;
+    std::cout << "UV: " << UV << std::endl;
+    //std::cout << compute_total_energy(data_mesh, UV, et, true) << std::endl;
+    std::cout << compute_total_energy_localjacob(data_mesh, UV, EnergyType::DIRICHLET) << std::endl;
+
     break;
   }
   case '8': {
     //compareIDTvsIPARAM(data_mesh, freeBoundary, EnergyType::ARAP, UV_o, UV);
     break;
+  }
+  case 'f':{
+    unsigned del;
+    queue_flip(data_mesh, UV, del, et);
+    std::cout << compute_total_energy(data_mesh, UV, et, true) << std::endl;
+    std::cout << compute_total_energy_localjacob(data_mesh, UV, et) << std::endl;
+    break;
+
   }
   case 'l':
   {

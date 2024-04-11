@@ -33,8 +33,8 @@ if(argc < 4) {
   bool queue = argc > 5 && (std::string(argv[5]) == "prio");
   // std::cout << queue << "\n";
   read_mesh(mesh_path,V,F);
-  igl::doublearea(V,F,A);
-  V /=sqrt(A.sum());
+  //igl::doublearea(V,F,A);
+  //V /=sqrt(A.sum());
 
   std::fstream log;
   std::string filename = mesh_path.substr(mesh_path.find_last_of("/\\") + 1);

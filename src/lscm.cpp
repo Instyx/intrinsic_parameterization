@@ -87,8 +87,8 @@ void lscm(
   const Eigen::MatrixXi& F,
   const Eigen::MatrixXd& V,
   const Eigen::SparseMatrix<double>& L,
-  int fixed1,
-  int fixed2,
+  const unsigned fixed1,
+  const unsigned fixed2,
   Eigen::MatrixXd& UV
 ){
   const int nV = V.rows();
@@ -133,8 +133,10 @@ void lscm(
   const Eigen::MatrixXi& F,
   const Eigen::MatrixXd& V,
   const Eigen::SparseMatrix<double>& L,
-  const Eigen::Matrix<double,-1,2>& UV_init,
-  Eigen::Matrix<double, -1,2>& UV
+  const Eigen::MatrixXd& UV_init,
+  const unsigned fixed1,
+  const unsigned fixed2,
+  Eigen::MatrixXd& UV
 ){
   const int nV = V.rows();
 
@@ -158,16 +160,7 @@ void lscm(
   X.resize(nV*2,1);
 
   X << UV_init.col(0), UV_init.col(1);
-  // igl::boundary_loop(F, boundary);
-  unsigned fixed1 = boundary[0], fixed2 = boundary[0];
-  for (unsigned i = 0; i < boundary.rows(); ++i) {
-    for (unsigned j = 0; j < boundary.rows(); ++j) {
-      if((V.row(boundary[i])-V.row(boundary[j])).norm()>(V.row(fixed1)-V.row(fixed2)).norm()){
-        fixed1 = boundary[i];
-        fixed2 = boundary[j];
-      }
-    }
-  }
+  
   B(0) = fixed1;
   B(1) = fixed2;
   B(2) = fixed1+nV;

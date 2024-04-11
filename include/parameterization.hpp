@@ -34,6 +34,7 @@ double compute_total_energy_fast(DataGeo &data_mesh, const Eigen::MatrixXd &UV, 
     const Eigen::SparseMatrix<double> &Dy, const Eigen::VectorXd &areas, const EnergyType &et);
 
 double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et);
+double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, int face_id);
 
 // boundary constraints are stored as static variables, for the purpose of testing this resets the static variables
 void reset_constraints();

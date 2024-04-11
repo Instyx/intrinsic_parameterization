@@ -17,7 +17,7 @@ struct DataGeo{
   Eigen::Matrix<int, -1, 3> F;
   
   // intrinsic triangulation
-  std::unique_ptr<gcs::IntrinsicTriangulation> intTri;
+  std::unique_ptr<gcs::SignpostIntrinsicTriangulation> intTri;
   std::unique_ptr<gcs::ManifoldSurfaceMesh> inputMesh;
   std::unique_ptr<gcs::VertexPositionGeometry> inputGeometry;
 

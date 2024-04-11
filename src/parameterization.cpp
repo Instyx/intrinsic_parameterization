@@ -851,7 +851,9 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   int i = 0;
   std::array<gcs::Halfedge, 3> halfedges;
   data_mesh.intTri->requireEdgeLengths();
+  data_mesh.intTri->unrequireEdgeLengths();
   data_mesh.intTri->requireVertexIndices();
+  data_mesh.intTri->unrequireVertexIndices();
 
   for(gcs::Halfedge he : f.adjacentHalfedges()){
     if(i==3) break; // assumed triangle faces
@@ -878,12 +880,13 @@ void faceJacobian(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Face f, Ei
   E_tilde_inverse << E_tilde(1,1), -E_tilde(0,1), -E_tilde(1,0), E_tilde(0,0);
   E_tilde_inverse = E_tilde_inverse/E_tilde.determinant();
   J = E * E_tilde.inverse();
-
 }
 
 double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et){
+  return compute_total_energy_localjacob(data_mesh, UV, et, -1);
+}
+double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd &UV, const EnergyType &et, int face_id){
 
-  data_mesh.intTri->requireFaceIndices();
   double (*energy)(const Eigen::Matrix2d &);
 
   if(et == EnergyType::DIRICHLET) energy = &dirichlet;
@@ -893,18 +896,24 @@ double compute_total_energy_localjacob(DataGeo &data_mesh, const Eigen::MatrixXd
 
   Eigen::VectorXd areas_UV;
 
-  Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
-  igl::doublearea(UV, F_new, areas_UV);
-  areas_UV/=2;
+  if(et == EnergyType::ASAP){ 
+    Eigen::MatrixXi F_new = data_mesh.intTri->intrinsicMesh->getFaceVertexMatrix<int>();
+    igl::doublearea(UV, F_new, areas_UV);
+    areas_UV/=2;
+  }
 
   double total_energy = 0;
   double total_area = 0;
   for(gcs::Face f : data_mesh.intTri->intrinsicMesh->faces()){
-    size_t idx = data_mesh.intTri->faceIndices[f];
     Eigen::Matrix2d J;
     faceJacobian(data_mesh, UV, f, J);
     double curr_area = data_mesh.intTri->faceArea(f);
-    //if(idx == 13227) std::cout << "idx " << idx << ":  " << curr_area << std::endl;
+    /*
+    if(face_id == f.getIndex()){
+      std::cout << "idx " << face_id << ":  " << curr_area <<  " ; " << energy(J) << std::endl;
+      if(f.getIndex() == 10) std::cout << "J: " << J << std::endl;
+    }
+    */
     total_area += curr_area;
     total_energy += curr_area * energy(J);
   }
