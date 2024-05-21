@@ -39,7 +39,7 @@ void tri_wise_energy_int(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (
     E.resize( mesh_data.intTri->intrinsicMesh->nFaces());
 
     mesh_data.intTri->requireEdgeLengths();
-    mesh_data.intTri->requireFaceAreas();
+    // mesh_data.intTri->requireFaceAreas();
     size_t i = 0;
     for(auto f : mesh_data.intTri->intrinsicMesh->faces()) {
       double lens[3];
@@ -50,11 +50,11 @@ void tri_wise_energy_int(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (
         indices[k] = he.tailVertex().getIndex();
         ++k;
       }
-      const double area = mesh_data.intTri->faceArea(f);
-      areassum += area;
-      E(i++) = energy(get_J(UV, lens, indices))*area;
+      // const double area = mesh_data.intTri->faceArea(f);
+      // areassum += area;
+      E(i++) = energy(get_J(UV, lens, indices));//*area;
     }
-    E /= areassum;
+    // E /= areassum;
 }
 
 void tri_wise_energy_ext(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (*energy)(const Eigen::Matrix2d &), Eigen::VectorXd& E){
@@ -71,10 +71,10 @@ void tri_wise_energy_ext(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (
       const double lens[3] = {(v1-v0).norm(), (v2-v1).norm(), (v0-v2).norm()};
       const double area = (v1-v0).cross((v2-v0)).norm()/2;
 
-      areassum += area;
-      E(i) = energy(get_J(UV, lens, indices))*area;
+      // areassum += area;
+      E(i) = energy(get_J(UV, lens, indices));//*area;
     }
-    E /= areassum;
+    // E /= areassum;
 }
 
 void tri_wise_energy(DataGeo& mesh_data, const Eigen::MatrixXd& UV, double (*energy)(const Eigen::Matrix2d &), const bool intrinsic, Eigen::VectorXd& E){

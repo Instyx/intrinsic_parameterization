@@ -65,6 +65,8 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
 }
 
 void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, const std::string filename, const Eigen::VectorXd& beforeTriEnergy, const Eigen::VectorXd& afterTriEnergy, Results &res){
+  data_mesh.intTri->requireFaceAreas();
+  data_mesh.intTri->unrequireFaceAreas();
 
   auto start = std::chrono::high_resolution_clock::now();
   gcs::CommonSubdivision& cs = data_mesh.intTri->getCommonSubdivision();
@@ -84,9 +86,11 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
   gcs::FaceData<double> beforeTriEnergyData = gcs::FaceData<double>(*data_mesh.inputMesh, beforeTriEnergy);
   gcs::FaceData<double> afterTriEnergyData = gcs::FaceData<double>(*data_mesh.intTri->intrinsicMesh, afterTriEnergy);
   gcs::FaceData<double> extrId(*cs.mesh), intrId(*cs.mesh);
+  gcs::FaceData<double> intrArea = data_mesh.intTri->faceAreas;
   auto color = cs.copyFromB(colorIDs);
   auto extr = cs.copyFromA(beforeTriEnergyData);
   auto intr = cs.copyFromB(afterTriEnergyData);
+  auto area = cs.copyFromB(intrArea);
   for (auto f : cs.mesh->faces()) {
     extrId[f] = cs.sourceFaceA[f].getIndex();
     intrId[f] = cs.sourceFaceB[f].getIndex();
@@ -126,6 +130,7 @@ void store_intrinsic_mesh(const DataGeo &data_mesh, const Eigen::MatrixXd &UV, c
   richData.addFaceProperty("ExtrID", extrId);
   richData.addFaceProperty("IntrColor", color);
   richData.addFaceProperty("IntrID", intrId);
+  richData.addFaceProperty("IntrArea", area);
   richData.addFaceProperty("ExtrEnergy", extr);
   richData.addFaceProperty("IntrEnergy", intr);
   richData.write(filename+".int.ply");
