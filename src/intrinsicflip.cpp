@@ -460,7 +460,7 @@ namespace std{
     };
 }
 
-unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
+unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et, const bool rando){
   auto energy = dirichlet;
   if(et==EnergyType::DIRICHLET) energy = dirichlet;
   else if(et==EnergyType::ASAP) energy = asap;
@@ -471,9 +471,21 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
   delaunay_flips = 0;
   std::unordered_map<std::tuple<int, int, int, int>, bool> checked_diamonds;
   std::queue<gcs::Edge> q;
-  for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
-    q.push(e);
+
+  if(rando){
+    std::vector<size_t> indices(data_mesh.intTri->intrinsicMesh->nEdges());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::shuffle(indices.begin(), indices.end(), std::mt19937 {std::random_device{}()});
+    for(size_t idx : indices){
+      gcs::Edge e = data_mesh.intTri->intrinsicMesh->edge(idx);
+      q.push(e);
+    }
   }
+  else{
+    for(gcs::Edge e: data_mesh.intTri->intrinsicMesh->edges()) {
+      q.push(e);
+    }
+  } 
   while (!q.empty()){
     gcs::Edge e = q.front();q.pop();
     if(e.isBoundary()) continue;
@@ -540,6 +552,10 @@ unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &del
   data_mesh.intTri->unrequireEdgeLengths();
   data_mesh.intTri->refreshQuantities();
   return totalflips;
+}
+
+unsigned queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
+  return queue_flip(data_mesh, UV, delaunay_flips, et, false);
 }
 
 unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
