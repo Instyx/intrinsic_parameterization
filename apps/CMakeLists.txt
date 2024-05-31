@@ -13,3 +13,9 @@ target_compile_options(filter PRIVATE -O3 )
 add_executable(test test.cpp)
 target_link_libraries(test PUBLIC iparam_core)
 target_compile_options(test PRIVATE -O3 )
+
+add_executable(random random.cpp)
+target_link_libraries(random PUBLIC iparam_core)
+target_compile_options(random PRIVATE -O3)
+
+
