@@ -7,34 +7,66 @@
 #include <igl/face_areas.h>
 #include "optimize_new.hpp"
 
-void optimize_log(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const std::string method, std::string filename, const std::string outdir, const bool start, unsigned random_runs){
+int main(int argc, char *argv[]) {
+  // evaluation
+if(argc < 4) {
+    std::cout << "You have to specify the parameterization" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "./cli <method> <mesh> <output> [start] [queue]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "<method> in [dirichlet, arap, asap, symdirichlet]" << std::endl;
+    std::cout << "<mesh>   as filepath" << std::endl;
+    std::cout << "<output> as directory" << std::endl;
+    std::cout << "[start] in [normal (dc), delaunay]" << std::endl;
+    std::cout << "[queue] in [queue (dc), prio]" << std::endl;
+    return 0;
+  }
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  Eigen::VectorXd A;
+  DataGeo data_mesh;
+  std::string method = std::string(argv[1]);
+  std::string mesh_path = std::string(argv[2]);
+  std::string outdir = std::string(argv[3]);
+  bool start = argc > 4 && (std::string(argv[4]) == "delaunay");
+  // std::cout << start << "\n";
+  bool queue = argc > 5 && (std::string(argv[5]) == "prio");
+  // std::cout << queue << "\n";
+  read_mesh(mesh_path,V,F);
+  //igl::doublearea(V,F,A);
+  //V /=sqrt(A.sum());
+
   std::fstream log;
+  std::string filename = mesh_path.substr(mesh_path.find_last_of("/\\") + 1);
+  size_t lastindex = filename.find_last_of(".");
+  std::string mesh_name_wo_extension =  filename.substr(0, lastindex);
+  std::string to_store_dir = outdir + "/" + mesh_name_wo_extension;
+  int random_runs = 50;
   Results res;
   if (method == "dirichlet"){
     // test_Dirichlet_single(V, F, outdir, filename, std::cout);
-    res = optimize_single_random(V, F, EnergyType::DIRICHLET, outdir, filename, start, random_runs);
+    res = optimize_single_new(V, F, EnergyType::DIRICHLET, outdir, filename, start, queue, random_runs);
   } else if (method == "arap"){
     // test_ARAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single_random(V, F, EnergyType::ARAP, outdir, filename, start, random_runs);
+    res = optimize_single_new(V, F, EnergyType::ARAP, outdir, filename, start, queue, random_runs);
   } else if (method == "asap"){
     // test_ASAP_single(V, F, outdir, filename, true, log);
-    res = optimize_single_random(V, F, EnergyType::ASAP, outdir, filename, start, random_runs);
+    res = optimize_single_new(V, F, EnergyType::ASAP, outdir, filename, start, queue, random_runs);
   } else if (method == "symdirichlet"){
     // test_SymDirichlet_single(V, F, outdir, filename, log);
-    res = optimize_single_random(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, random_runs);
+    res = optimize_single_new(V, F, EnergyType::SYMMETRIC_DIRICHLET, outdir, filename, start, queue, random_runs);
   } else {
     std::cout << "Method '" << method << "' is unknown." << std::endl;
-    return;
+    return 1;
   }
-  std::filesystem::create_directory(outdir);
+  std::filesystem::create_directory(to_store_dir);
 
-  log.open(outdir+"/results_"+method+".log", std::ios::out);
+  log.open(to_store_dir+"/results_"+method+".log", std::ios::out);
   double sum = res.init_time;
   // print res
-  log << filename << "," << method << "," << (start ? "delaunay_init" : "normal_init") << ","  << "\n";
+  log << filename << "," << method << "," << (start ? "delaunay_init" : "normal_init") << "," << (queue ? "priority_queue" : "normal_queue") << "\n";
 
   log << "init_time," << res.init_time << "\n";
-  /*
   log << "energies";
   for(double i : res.energies)
     log << "," << std::setprecision(32) << i;
@@ -76,12 +108,7 @@ void optimize_log(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const std::string meth
   log << "mesh_construction_time," << res.cm_time << "\n";
   log << "ext_vertices," << res.ext_vertex_count << "\n";
   log << "cs_vertices," << res.cs_vertex_count << "\n";
-*/
-  log << "pq_energy," << std::setprecision(32)  << res.pq_flip_energy << "\n";
-  log << "pq_total_iteration," << res.pq_flip_iteration << "\n";
 
-  log << "q_energy," << std::setprecision(32) << res.q_flip_energy << "\n";
-  log << "q_total_iteration," << res.q_flip_iteration << "\n";
   log << "random_energies";
   for(double i : res.random_flip_energies){
     log << "," << std::setprecision(32)  << i;
@@ -92,48 +119,5 @@ void optimize_log(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const std::string meth
     log << "," << i;
   }
   log << "\n";
-
-
-}
-
-int main(int argc, char *argv[]) {
-  // evaluation
-if(argc < 4) {
-    std::cout << "You have to specify the parameterization" << std::endl;
-    std::cout << "" << std::endl;
-    std::cout << "./cli <method> <mesh> <output> [start] [queue]" << std::endl;
-    std::cout << "" << std::endl;
-    std::cout << "<method> in [dirichlet, arap, asap, symdirichlet]" << std::endl;
-    std::cout << "<mesh>   as filepath" << std::endl;
-    std::cout << "<output> as directory" << std::endl;
-    std::cout << "[start] in [normal (dc), delaunay]" << std::endl;
-    std::cout << "[queue] in [queue (dc), prio]" << std::endl;
-    return 0;
-  }
-  Eigen::MatrixXd V;
-  Eigen::MatrixXi F;
-  Eigen::VectorXd A;
-  DataGeo data_mesh;
-  std::string method = std::string(argv[1]);
-  std::string mesh_path = std::string(argv[2]);
-  std::string outdir = std::string(argv[3]);
-  bool start = argc > 4 && (std::string(argv[4]) == "delaunay");
-  // std::cout << start << "\n";
-  bool queue = argc > 5 && (std::string(argv[5]) == "prio");
-  // std::cout << queue << "\n";
-  read_mesh(mesh_path,V,F);
-  //igl::doublearea(V,F,A);
-  //V /=sqrt(A.sum());
-  
-  std::string filename = mesh_path.substr(mesh_path.find_last_of("/\\") + 1);
-  size_t lastindex = filename.find_last_of(".");
-  std::string mesh_name_wo_extension =  filename.substr(0, lastindex);
-  std::string to_store_dir = outdir + "/" + mesh_name_wo_extension;
-
-  std::filesystem::create_directory(to_store_dir);
-
-  optimize_log(V, F, method, filename, to_store_dir, start, 10);
-
-
- 	return 0;
+	return 0;
 }

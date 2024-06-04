@@ -235,26 +235,43 @@ double flippeddiff(DataGeo &data_mesh, const Eigen::MatrixXd &UV, gcs::Edge e, c
   Eigen::Matrix2d J1, J2, J1_prime, J2_prime;
 
   // if flip is not possible return 0
-  if(!diamondJacobians(data_mesh, UV, e, J1, J2)){
+  if(!isFlipPossible(data_mesh, UV, e)){
     return 0;
   }
+
+  faceJacobian(data_mesh, UV, f1, J1);
+  faceJacobian(data_mesh, UV, f2, J2);
+
   double before = energy(J1) * data_mesh.intTri->faceArea(f1) +
                   energy(J2) * data_mesh.intTri->faceArea(f2);
+
   if(!data_mesh.intTri->flipEdgeIfPossible(e)) return 0;
   gcs::Edge flipped = e;
 
-  diamondJacobians(data_mesh, UV, flipped, J1_prime, J2_prime);
+  f1 = flipped.halfedge().face();
+  f2 = flipped.halfedge().twin().face();
+  faceJacobian(data_mesh, UV, f1, J1_prime);
+  faceJacobian(data_mesh, UV, f2, J2_prime);
 
-  double after = energy(J1_prime) * data_mesh.intTri->faceArea(flipped.halfedge().face()) + energy(J2_prime) * data_mesh.intTri->faceArea(flipped.halfedge().twin().face());
+  double after = energy(J1_prime) * data_mesh.intTri->faceArea(f1) +
+                 energy(J2_prime) * data_mesh.intTri->faceArea(f2);
 
-  double tolerance = 1e-6; // set tolerance to 1e-6
-  data_mesh.intTri->flipEdgeIfPossible(flipped);
-  if (fabs(before - after) / std::max(fabs(before), fabs(after)) > tolerance) {
-    return after - before;
-  }
-  else {
+
+  if(!data_mesh.intTri->flipEdgeIfPossible(flipped)){
+    std::cout << "BIG Prob" << std::endl;
     return 0;
   }
+  double tolerance = 1e-4;
+  double abs_tolerance = 1e-10;
+
+  double diff = fabs(before-after);
+
+  if (before > after && (diff / std::max(fabs(before), fabs(after)) > tolerance && diff>abs_tolerance )) {
+    return after - before;
+  } else {
+    return 0;
+  }
+
 }
 
 unsigned greedy_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsigned &delaunay_flips, const EnergyType &et){
@@ -565,7 +582,6 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
   else if(et==EnergyType::ARAP) energy = arap;
   else if(et==EnergyType::SYMMETRIC_DIRICHLET) energy = symmetric_dirichlet;
   data_mesh.intTri->requireEdgeLengths();
-  data_mesh.intTri->unrequireEdgeLengths();
 
   unsigned totalflips = 0;
   delaunay_flips = 0;
@@ -602,6 +618,9 @@ unsigned priority_queue_flip(DataGeo &data_mesh, const Eigen::MatrixXd &UV, unsi
       actual_energies[next_e.getIndex()] = diff;
     }
   }
+  data_mesh.intTri->unrequireEdgeLengths();
+  data_mesh.intTri->refreshQuantities();
+
   return totalflips;
 }
 
